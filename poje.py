@@ -47,7 +47,7 @@ def handle_checkbox_change(cb_key, save_key, date_key):
             update_state_val(date_key, "")
 
 # ==========================================
-# 3. REPORT GENERATION WRAPPER (TURKISH)
+# 3. REPORT GENERATION WRAPPER
 # ==========================================
 def make_report_wrapper(title, content_html):
     today_str = date.today().strftime('%d.%m.%Y')
@@ -122,12 +122,15 @@ update_state_val("global_pm_price_toilet", pm_price_toilet)
 tech_price_toilet = st.sidebar.number_input("Usta Maliyeti - Kara Sıva", value=get_state_val("global_tech_price_toilet", 500.0), step=10.0)
 update_state_val("global_tech_price_toilet", tech_price_toilet)
 
-# İlerleme Katsayıları
+# Ağırlık Katsayıları
 interior_weights = {"Ano": 0.15, "Alci": 0.40, "Saten": 0.25, "Boya": 0.20}
-exterior_weights = {"Siva": 0.30, "Mantolama": 0.40, "Astar": 0.10, "Boya": 0.20}
+# Standart dış cephe (Yalıtımlı)
+exterior_weights_insulated = {"Siva": 0.30, "Mantolama": 0.40, "Astar": 0.10, "Boya": 0.20}
+# Yalıtımsız ön dış cephe dönüşleri (Sıva %45, Astar %15, Boya %40)
+exterior_weights_no_insulation = {"Siva": 0.45, "Astar": 0.15, "Boya": 0.40}
 
 # ==========================================
-# 5. FIXED DATA STRUCTURE (RESTORED OLD METRAJ)
+# 5. FIXED DATA STRUCTURE WITH NEW EXTERIOR METRAJ
 # ==========================================
 project_structure = {
     "Kat -1 (Bodrum Katı)": {
@@ -174,10 +177,13 @@ project_structure = {
         "Dublex Daire Tuvaletleri": {"area": 22.60, "type": "toilet"}
     },
     "Binanın Dış Cepheleri": {
-        "Ana Ön Cephe": {"area": 280.00, "type": "exterior"},
-        "Arka Cephe": {"area": 240.00, "type": "exterior"},
-        "Sağ Yan Cephe": {"area": 200.00, "type": "exterior"}, 
-        "Sol Yan Cephe": {"area": 200.00, "type": "exterior"}
+        "Arka Dış Cephe - Ana Yüzey": {"area": 104.40, "type": "exterior"},
+        "Arka Dış Cephe - 1. Yan": {"area": 136.50, "type": "exterior"},
+        "Arka Dış Cephe - 2. Yan": {"area": 83.00, "type": "exterior"},
+        "Arka Dış Cephe - 3. Yan": {"area": 33.00, "type": "exterior"},
+        "Ön Dış Cephe - Ana Yüzey": {"area": 80.00, "type": "exterior"},
+        "Ön Dış Cephe - 1. Yan (Yalıtımsız)": {"area": 68.25, "type": "exterior_no_ins"},
+        "Ön Dış Cephe - 2. Yan (Yalıtımsız)": {"area": 41.50, "type": "exterior_no_ins"}
     }
 }
 
@@ -215,16 +221,28 @@ for floor_name, sections in project_structure.items():
             p2 = get_state_val(f"cb_ext_mant_{global_idx}", False)
             p3 = get_state_val(f"cb_ext_ast_{global_idx}", False)
             p4 = get_state_val(f"cb_ext_boy_{global_idx}", False)
-            sec_progress = ((exterior_weights["Siva"] if p1 else 0) + 
-                            (exterior_weights["Mantolama"] if p2 else 0) + 
-                            (exterior_weights["Astar"] if p3 else 0) + 
-                            (exterior_weights["Boya"] if p4 else 0))
+            sec_progress = ((exterior_weights_insulated["Siva"] if p1 else 0) + 
+                            (exterior_weights_insulated["Mantolama"] if p2 else 0) + 
+                            (exterior_weights_insulated["Astar"] if p3 else 0) + 
+                            (exterior_weights_insulated["Boya"] if p4 else 0))
             current_pm = pm_price_ext
             current_tech = tech_price_ext
             phases = [("ext_siva", "Kaba Sıva"), ("ext_mant", "Mantolama"), ("ext_ast", "Dış Cephe Astar"), ("ext_boy", "Dış Cephe Boya")]
             p_states = [p1, p2, p3, p4]
             
-        else: # toilet (Sadece Kara Sıva - Tek adım %100)
+        elif sec_type == "exterior_no_ins":
+            p1 = get_state_val(f"cb_ext_siva_{global_idx}", False)
+            p3 = get_state_val(f"cb_ext_ast_{global_idx}", False)
+            p4 = get_state_val(f"cb_ext_boy_{global_idx}", False)
+            sec_progress = ((exterior_weights_no_insulation["Siva"] if p1 else 0) + 
+                            (exterior_weights_no_insulation["Astar"] if p3 else 0) + 
+                            (exterior_weights_no_insulation["Boya"] if p4 else 0))
+            current_pm = pm_price_ext
+            current_tech = tech_price_ext
+            phases = [("ext_siva", "Kaba Sıva"), ("ext_ast", "Dış Cephe Astar"), ("ext_boy", "Dış Cephe Boya")]
+            p_states = [p1, False, p3, p4]
+            
+        else: # toilet (Kara Sıva)
             p1 = get_state_val(f"cb_toi_ksiva_{global_idx}", False)
             sec_progress = 1.0 if p1 else 0.0
             current_pm = pm_price_toilet
@@ -305,7 +323,7 @@ elif app_page == "💰 Genel Finansal Durum & Hakediş":
     
     table_rows_html = ""
     report_list = []
-    type_map = {"interior": "İç Mekan", "exterior": "Dış Cephe", "toilet": "Kara Sıva (Tuvalet)"}
+    type_map = {"interior": "İç Mekan", "exterior": "Dış Cephe (Yalıtımlı)", "exterior_no_ins": "Dış Cephe (Yalıtımsız)", "toilet": "Kara Sıva (Tuvalet)"}
     
     for item in flat_sections:
         sec_bill = item["comp_area"] * item["pm_price"]
@@ -346,8 +364,8 @@ elif app_page == "💰 Genel Finansal Durum & Hakediş":
     
     st.dataframe(pd.DataFrame(report_list), use_container_width=True)
 
-# --- PAGE 3: INTERIOR WORK (RESTORED & FIXED) ---
-elif app_page == "🏠 أعمال التشطيبات الداخلية (İç Tesisat)" or app_page == "🏠 İç Mekan İşleri (Alçı & Sıva)":
+# --- PAGE 3: INTERIOR WORK ---
+elif app_page == "🏠 İç Mekan İşleri (Alçı & Sıva)":
     st.header("🏠 İç Mekan Alçı, Sıva ve Boya İşleri Kontrolü")
     
     for floor_name in project_structure.keys():
@@ -371,11 +389,11 @@ elif app_page == "🏠 أعمال التشطيبات الداخلية (İç Tesi
                         st.write(f"Bölüm İlerlemesi: `%{item['progress']*100:.0f}` | Eşdeğer Alan: `{item['comp_area']:.2f} m²`")
                         st.markdown("---")
 
-# --- PAGE 4: EXTERIOR WORK ---
+# --- PAGE 4: EXTERIOR WORK (UPDATED WITH BREAKDOWN & INSULATION CHECK) ---
 elif app_page == "🧱 Dış Cephe İşleri":
-    st.header("🧱 Dış Cephe Yalıtım ve Boya İmalatları (Mantolama)")
+    st.header("🧱 Dış Cephe Yalıtım, Sıva ve Boya İmalatları")
     
-    exterior_items = [x for x in flat_sections if x["type"] == "exterior"]
+    exterior_items = [x for x in flat_sections if x["type"] in ["exterior", "exterior_no_ins"]]
     if exterior_items:
         c1, c2 = st.columns(2)
         for i, item in enumerate(exterior_items):
@@ -383,18 +401,26 @@ elif app_page == "🧱 Dış Cephe İşleri":
             col = c1 if i % 2 == 0 else c2
             with col:
                 st.write(f"##### 🧱 {item['section']} ({item['area']:.2f} m²)")
-                st.checkbox("Kaba Sıva Uygulaması [30%]", value=item["p1"], key=f"p_ext_siva_{g_id}", 
+                
+                # Kaba Sıva her iki tipte de var
+                st.checkbox("Kaba Sıva Uygulaması", value=item["p1"], key=f"p_ext_siva_{g_id}", 
                             on_change=handle_checkbox_change, args=(f"p_ext_siva_{g_id}", f"cb_ext_siva_{g_id}", f"date_ext_siva_{g_id}"))
-                st.checkbox("Mantolama (Isı Yalıtım Levhası & Dübel) [40%]", value=item["p2"], key=f"p_ext_mant_{g_id}", 
-                            on_change=handle_checkbox_change, args=(f"p_ext_mant_{g_id}", f"cb_ext_mant_{g_id}", f"date_ext_mant_{g_id}"))
-                st.checkbox("Dış Cephe Macun & Astar [10%]", value=item["p3"], key=f"p_ext_ast_{g_id}", 
+                
+                # Sadece yalıtımlı cephede Mantolama adımı görünür
+                if item["type"] == "exterior":
+                    st.checkbox("Mantolama (Isı Yalıtımı) [40%]", value=item["p2"], key=f"p_ext_mant_{g_id}", 
+                                on_change=handle_checkbox_change, args=(f"p_ext_mant_{g_id}", f"cb_ext_mant_{g_id}", f"date_ext_mant_{g_id}"))
+                
+                st.checkbox("Dış Cephe Macun & Astar", value=item["p3"], key=f"p_ext_ast_{g_id}", 
                             on_change=handle_checkbox_change, args=(f"p_ext_ast_{g_id}", f"cb_ext_ast_{g_id}", f"date_ext_ast_{g_id}"))
-                st.checkbox("Dış Cephe Grenli/Düz Boya [20%]", value=item["p4"], key=f"p_ext_boy_{g_id}", 
+                
+                st.checkbox("Dış Cephe Grenli/Düz Boya", value=item["p4"], key=f"p_ext_boy_{g_id}", 
                             on_change=handle_checkbox_change, args=(f"p_ext_boy_{g_id}", f"cb_ext_boy_{g_id}", f"date_ext_boy_{g_id}"))
+                
                 st.write(f"Bölüm İlerlemesi: `%{item['progress']*100:.0f}` | Eşdeğer Alan: `{item['comp_area']:.2f} m²`")
                 st.markdown("---")
 
-# --- PAGE 5: TOILET WORK (KARA SIVA ONLY) ---
+# --- PAGE 5: TOILET WORK ---
 elif app_page == "💧 Tuvalet & Islak Hacim (Kara Sıva)":
     st.header("💧 Tuvalet ve Islak Hacim Kara Sıva Kontrolü")
     
