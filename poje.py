@@ -7,7 +7,7 @@ from datetime import datetime, date
 # ==========================================
 # 1. PAGE SETUP & CONFIGURATION
 # ==========================================
-st.set_page_config(page_title="Havence - Multi-Page Dashboard", layout="wide", page_icon="🏗️")
+st.set_page_config(page_title="Havence - Multi-Page Master System", layout="wide", page_icon="🏗️")
 
 # ==========================================
 # 2. DATA PERSISTENCE ENGINE (JSON DATABASE)
@@ -90,16 +90,16 @@ def make_report_wrapper(title, content_html):
     """
 
 # ==========================================
-# 4. SIDEBAR - DYNAMIC NAVIGATION & PRICES
+# 4. SIDEBAR NAVIGATION & MASTER PRICES
 # ==========================================
 st.sidebar.image("https://img.icons8.com/clouds/100/000000/building.png", width=80)
 st.sidebar.title("Havence Control")
 st.sidebar.markdown("---")
 
-# تفعيل التنقل بين الصفحات بشكل منفصل
 app_page = st.sidebar.radio(
     "📂 اختر الصفحة المطلوبة:",
     [
+        "🏁 حالة المشروع والجدول الزمني",
         "💰 الميزانية والمستخلصات الشاملة", 
         "🏠 أعمال التشطيبات الداخلية", 
         "🧱 أعمال الواجهات الخارجية", 
@@ -111,7 +111,6 @@ app_page = st.sidebar.radio(
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ إعدادات الأسعار (₺/m²)")
 
-# أسعار الفئات (مربوطة بقاعدة البيانات)
 pm_price_int = st.sidebar.number_input("البيع للمالك - داخلي", value=get_state_val("global_pm_price_int", 450.0), step=10.0)
 update_state_val("global_pm_price_int", pm_price_int)
 tech_price_int = st.sidebar.number_input("تكلفة الفني - داخلي", value=get_state_val("global_tech_price_int", 300.0), step=10.0)
@@ -127,13 +126,12 @@ update_state_val("global_pm_price_toilet", pm_price_toilet)
 tech_price_toilet = st.sidebar.number_input("تكلفة الفني - حمامات", value=get_state_val("global_tech_price_toilet", 500.0), step=10.0)
 update_state_val("global_tech_price_toilet", tech_price_toilet)
 
-# الأوزان النسبية الهندسية
 interior_weights = {"Ano": 0.15, "Alci": 0.40, "Saten": 0.25, "Boya": 0.20}
 exterior_weights = {"Siva": 0.30, "Mantolama": 0.40, "Astar": 0.10, "Boya": 0.20}
 toilet_weights = {"Tesisat": 0.25, "Izolasyon": 0.20, "Seramik": 0.45, "Montaj": 0.10}
 
 # ==========================================
-# 5. FIXED DATA STRUCTURE (SURVEYING)
+# 5. RESTORED CORRECT DIMENSIONS (OLD APP)
 # ==========================================
 project_structure = {
     "الدور -1 (البدروم السكني والخدمي)": {
@@ -182,7 +180,7 @@ project_structure = {
     "الواجهات الخارجية للمبنى": {
         "الواجهة الأمامية الرئيسية": {"area": 280.00, "type": "exterior"},
         "الواجهة الخلفية": {"area": 240.00, "type": "exterior"},
-        "الجانب الأيمن (Yan Cephe)": {"area": 20.00 * 10.00, "type": "exterior"}, # الارتفاع المحدث 20 متر
+        "الجانب الأيمن (Yan Cephe)": {"area": 200.00, "type": "exterior"}, # الارتفاع والمسارات القديمة الصحيحة
         "الجانب الأيسر": {"area": 200.00, "type": "exterior"}
     }
 }
@@ -261,8 +259,49 @@ overall_progress_pct = (total_completed_equivalent_area / total_project_area) if
 # 7. MULTI-PAGE ROUTING LOGIC
 # ==========================================
 
-# --- PAGE 1: MONEY & TOTAL DASHBOARD ---
-if app_page == "💰 الميزانية والمستخلصات الشاملة":
+# --- PAGE 1: START, END & PROJECT SCHEDULE TRACKING ---
+if app_page == "🏁 حالة المشروع والجدول الزمني":
+    st.header("🏁 متابعة تواريخ تنفيذ المشروع والجدول المخطط له")
+    
+    col_t1, col_t2 = st.columns(2)
+    with col_t1:
+        start_date = st.date_input("🗓️ تاريخ بداية المشروع الفعلي:", value=datetime.strptime(get_state_val("proj_start_date", "2026-01-01"), "%Y-%m-%d").date())
+        update_state_val("proj_start_date", start_date.strftime("%Y-%m-%d"))
+    with col_t2:
+        end_date = st.date_input("🗓️ التاريخ المستهدف لتسليم المشروع:", value=datetime.strptime(get_state_val("proj_end_date", "2026-08-01"), "%Y-%m-%d").date())
+        update_state_val("proj_end_date", end_date.strftime("%Y-%m-%d"))
+        
+    st.markdown("---")
+    
+    # احتساب الفروق الزمنية وحالة المخطط
+    today_dt = date.today()
+    total_days = (end_date - start_date).days
+    days_passed = (today_dt - start_date).days
+    
+    if total_days > 0:
+        expected_progress_pct = max(0.0, min(100.0, (days_passed / total_days) * 100))
+    else:
+        expected_progress_pct = 100.0
+        
+    actual_progress_pct = overall_progress_pct * 100
+    
+    st.subheader("📊 مقارنة خطة العمل بالواقع الميداني")
+    c_m1, c_m2, c_m3 = st.columns(3)
+    c_m1.metric("النسبة الفعلية الحالية بالموقع", f"{actual_progress_pct:.2f}%")
+    c_m2.metric("النسبة المستهدفة حسب الجدول اليوم", f"{expected_progress_pct:.2f}%")
+    
+    # تحديد الحالة: On Schedule أو Delayed
+    if actual_progress_pct >= expected_progress_pct:
+        c_m3.success("🟢 On Schedule (منضبط)")
+        st.balloons()
+    else:
+        c_m3.error("🔴 Delayed (يوجد تأخير)")
+        
+    st.markdown("---")
+    st.info(f"💡 إجمالي الأيام المخصصة للمشروع: `{total_days}` يوماً | الأيام المنقضية حتى اليوم: `{max(0, days_passed)}` يوماً.")
+
+# --- PAGE 2: MONEY & TOTAL DASHBOARD ---
+elif app_page == "💰 الميزانية والمستخلصات الشاملة":
     st.header("💰 الحسابات المالية الإجمالية للمشروع")
     st.markdown(f"#### 📊 النسبة الكلية المكتملة للموقع: `{overall_progress_pct*100:.2f}%`")
     
@@ -316,7 +355,7 @@ if app_page == "💰 الميزانية والمستخلصات الشاملة":
     
     st.dataframe(pd.DataFrame(report_list), use_container_width=True)
 
-# --- PAGE 2: INTERIOR WORK ---
+# --- PAGE 3: INTERIOR WORK ---
 elif app_page == "🏠 أعمال التشطيبات الداخلية":
     st.header("🏠 إدارة ومتابعة التشطيبات الداخلية (İç Mekan)")
     
@@ -341,7 +380,7 @@ elif app_page == "🏠 أعمال التشطيبات الداخلية":
                         st.write(f"نسبة الإنجاز: `{item['progress']*100:.0f}%` | أمتار مكافئة: `{item['comp_area']:.2f} م²`")
                         st.markdown("---")
 
-# --- PAGE 3: EXTERIOR WORK ---
+# --- PAGE 4: EXTERIOR WORK ---
 elif app_page == "🧱 أعمال الواجهات الخارجية":
     st.header("🧱 إدارة ومتابعة أعمال الواجهات والـ Dış Cephe")
     
@@ -357,14 +396,14 @@ elif app_page == "🧱 أعمال الواجهات الخارجية":
                             on_change=handle_checkbox_change, args=(f"p_ext_siva_{g_id}", f"cb_ext_siva_{g_id}", f"date_ext_siva_{g_id}"))
                 st.checkbox("العزل الحراري (Mantolama) [40%]", value=item["p2"], key=f"p_ext_mant_{g_id}", 
                             on_change=handle_checkbox_change, args=(f"p_ext_mant_{g_id}", f"cb_ext_mant_{g_id}", f"date_ext_mant_{g_id}"))
-                st.checkbox("الوجه التحضيري (Astar) [10%]", value=item["p3"], key=f"p_ext_ast_{g_id}", 
+                st.checkbox("الجه التحضيري (Astar) [10%]", value=item["p3"], key=f"p_ext_ast_{g_id}", 
                             on_change=handle_checkbox_change, args=(f"p_ext_ast_{g_id}", f"cb_ext_ast_{g_id}", f"date_ext_ast_{g_id}"))
                 st.checkbox("الدهان الخارجي (Boya) [20%]", value=item["p4"], key=f"p_ext_boy_{g_id}", 
                             on_change=handle_checkbox_change, args=(f"p_ext_boy_{g_id}", f"cb_ext_boy_{g_id}", f"date_ext_boy_{g_id}"))
                 st.write(f"نسبة الإنجاز: `{item['progress']*100:.0f}%` | أمتار مكافئة: `{item['comp_area']:.2f} م²`")
                 st.markdown("---")
 
-# --- PAGE 4: TOILET WORK ---
+# --- PAGE 5: TOILET WORK ---
 elif app_page == "💧 أعمال الحمامات والمطابخ":
     st.header("💧 إدارة ومتابعة عزل وتأسيس الحمامات والمطابخ")
     
@@ -389,7 +428,7 @@ elif app_page == "💧 أعمال الحمامات والمطابخ":
                         st.write(f"نسبة الإنجاز: `{item['progress']*100:.0f}%` | أمتار مكافئة: `{item['comp_area']:.2f} م²`")
                         st.markdown("---")
 
-# --- PAGE 5: TIMELINE LOG ---
+# --- PAGE 6: TIMELINE LOG ---
 elif app_page == "⏱️ سجل الموقع الزمني":
     st.header("⏱️ الخط الزمني ومواعيد تسليم المراحل الفنية")
     
