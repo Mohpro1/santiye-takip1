@@ -64,10 +64,6 @@ def make_report_wrapper(title, content_html):
             .header {{ text-align: center; border-bottom: 3px solid #1E4620; padding-bottom: 15px; margin-bottom: 30px; }}
             .title {{ font-size: 24px; font-weight: bold; color: #1E4620; }}
             .date {{ font-size: 14px; color: #666; margin-top: 5px; }}
-            .grid {{ display: flex; gap: 15px; margin-bottom: 25px; }}
-            .card {{ flex: 1; background: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; text-align: center; }}
-            .card-lbl {{ font-size: 12px; font-weight: bold; color: #777; }}
-            .card-val {{ font-size: 22px; font-weight: bold; color: #111; margin-top: 5px; }}
             table {{ width: 100%; border-collapse: collapse; margin-bottom: 25px; text-align: left; }}
             th, td {{ border: 1px solid #dddddd; padding: 12px; font-size: 14px; }}
             th {{ background-color: #f5f5f5; font-weight: bold; color: #111; }}
@@ -101,9 +97,9 @@ app_page = st.sidebar.radio(
     [
         "🏁 Proje Durumu & İş Programı",
         "💰 Genel Finansal Durum & Hakediş", 
-        "🏠 İç Mekan التشطيبات الأعمال (İç Tesisat)", 
+        "🏠 İç Mekan İşleri (Alçı & Sıva)", 
         "🧱 Dış Cephe İşleri", 
-        "💧 Islak Hacim & Tuvalet İşleri",
+        "💧 Tuvalet & Islak Hacim (Kara Sıva)",
         "⏱️ Şantiye Günlüğü & Zaman Çizelgesi"
     ]
 )
@@ -121,17 +117,17 @@ update_state_val("global_pm_price_ext", pm_price_ext)
 tech_price_ext = st.sidebar.number_input("Usta Maliyeti - Dış Cephe", value=get_state_val("global_tech_price_ext", 400.0), step=10.0)
 update_state_val("global_tech_price_ext", tech_price_ext)
 
-pm_price_toilet = st.sidebar.number_input("İşveren Satış - Islak Hacim", value=get_state_val("global_pm_price_toilet", 750.0), step=10.0)
+pm_price_toilet = st.sidebar.number_input("İşveren Satış - Kara Sıva", value=get_state_val("global_pm_price_toilet", 750.0), step=10.0)
 update_state_val("global_pm_price_toilet", pm_price_toilet)
-tech_price_toilet = st.sidebar.number_input("Usta Maliyeti - Islak Hacim", value=get_state_val("global_tech_price_toilet", 500.0), step=10.0)
+tech_price_toilet = st.sidebar.number_input("Usta Maliyeti - Kara Sıva", value=get_state_val("global_tech_price_toilet", 500.0), step=10.0)
 update_state_val("global_tech_price_toilet", tech_price_toilet)
 
+# İlerleme Katsayıları
 interior_weights = {"Ano": 0.15, "Alci": 0.40, "Saten": 0.25, "Boya": 0.20}
 exterior_weights = {"Siva": 0.30, "Mantolama": 0.40, "Astar": 0.10, "Boya": 0.20}
-toilet_weights = {"Tesisat": 0.25, "Izolasyon": 0.20, "Seramik": 0.45, "Montaj": 0.10}
 
 # ==========================================
-# 5. FIXED DATA STRUCTURE (OLD APP REGISTER)
+# 5. FIXED DATA STRUCTURE (RESTORED OLD METRAJ)
 # ==========================================
 project_structure = {
     "Kat -1 (Bodrum Katı)": {
@@ -212,6 +208,7 @@ for floor_name, sections in project_structure.items():
             current_pm = pm_price_int
             current_tech = tech_price_int
             phases = [("int_ano", "Ano Çıtası"), ("int_alc", "Alçı Sıva"), ("int_sat", "Saten Alçı"), ("int_boy", "İç Cephe Boya")]
+            p_states = [p1, p2, p3, p4]
             
         elif sec_type == "exterior":
             p1 = get_state_val(f"cb_ext_siva_{global_idx}", False)
@@ -225,19 +222,15 @@ for floor_name, sections in project_structure.items():
             current_pm = pm_price_ext
             current_tech = tech_price_ext
             phases = [("ext_siva", "Kaba Sıva"), ("ext_mant", "Mantolama"), ("ext_ast", "Dış Cephe Astar"), ("ext_boy", "Dış Cephe Boya")]
+            p_states = [p1, p2, p3, p4]
             
-        else: # toilet
-            p1 = get_state_val(f"cb_toi_tes_{global_idx}", False)
-            p2 = get_state_val(f"cb_toi_izo_{global_idx}", False)
-            p3 = get_state_val(f"cb_toi_ser_{global_idx}", False)
-            p4 = get_state_val(f"cb_toi_mon_{global_idx}", False)
-            sec_progress = ((toilet_weights["Tesisat"] if p1 else 0) + 
-                            (toilet_weights["Izolasyon"] if p2 else 0) + 
-                            (toilet_weights["Seramik"] if p3 else 0) + 
-                            (toilet_weights["Montaj"] if p4 else 0))
+        else: # toilet (Sadece Kara Sıva - Tek adım %100)
+            p1 = get_state_val(f"cb_toi_ksiva_{global_idx}", False)
+            sec_progress = 1.0 if p1 else 0.0
             current_pm = pm_price_toilet
             current_tech = tech_price_toilet
-            phases = [("toi_tes", "Sıhhi Tesisat"), ("toi_izo", "Su Yalıtımı"), ("toi_ser", "Seramik Kaplama"), ("toi_mon", "Vitrifiye Montajı")]
+            phases = [("toi_ksiva", "Kara Sıva Uygulaması")]
+            p_states = [p1, False, False, False]
 
         completed_area = area * sec_progress
         total_project_area += area
@@ -249,7 +242,7 @@ for floor_name, sections in project_structure.items():
         flat_sections.append({
             "global_idx": global_idx, "floor": floor_name, "section": sec_name, "area": area, "type": sec_type,
             "progress": sec_progress, "comp_area": completed_area, "pm_price": current_pm, "tech_price": current_tech,
-            "phases": phases, "p1": p1, "p2": p2, "p3": p3, "p4": p4
+            "phases": phases, "p1": p_states[0], "p2": p_states[1], "p3": p_states[2], "p4": p_states[3]
         })
         global_idx += 1
 
@@ -259,7 +252,7 @@ overall_progress_pct = (total_completed_equivalent_area / total_project_area) if
 # 7. MULTI-PAGE ROUTING LOGIC
 # ==========================================
 
-# --- PAGE 1: START, END & PROJECT SCHEDULE TRACKING ---
+# --- PAGE 1: SCHEDULE TRACKING ---
 if app_page == "🏁 Proje Durumu & İş Programı":
     st.header("🏁 Proje Başlangıç/Bitiş Tarihleri & Planlanan Zaman Takibi")
     
@@ -273,7 +266,6 @@ if app_page == "🏁 Proje Durumu & İş Programı":
         
     st.markdown("---")
     
-    # Zaman hesabı
     today_dt = date.today()
     total_days = (end_date - start_date).days
     days_passed = (today_dt - start_date).days
@@ -299,7 +291,7 @@ if app_page == "🏁 Proje Durumu & İş Programı":
     st.markdown("---")
     st.info(f"💡 Toplam Ayrılan Süre: `{total_days}` Gün | Bugüne Kadar Geçen Süre: `{max(0, days_passed)}` Gün.")
 
-# --- PAGE 2: MONEY & TOTAL DASHBOARD ---
+# --- PAGE 2: FINANCIAL REPORT ---
 elif app_page == "💰 Genel Finansal Durum & Hakediş":
     st.header("💰 Şantiye Finansal Raporları & Toplam Kar/Zarar")
     st.markdown(f"#### 📊 Toplam Şantiye Tamamlanma Oranı: `%{overall_progress_pct*100:.2f}`")
@@ -313,7 +305,7 @@ elif app_page == "💰 Genel Finansal Durum & Hakediş":
     
     table_rows_html = ""
     report_list = []
-    type_map = {"interior": "İç Mekan", "exterior": "Dış Cephe", "toilet": "Islak Hacim"}
+    type_map = {"interior": "İç Mekan", "exterior": "Dış Cephe", "toilet": "Kara Sıva (Tuvalet)"}
     
     for item in flat_sections:
         sec_bill = item["comp_area"] * item["pm_price"]
@@ -354,8 +346,8 @@ elif app_page == "💰 Genel Finansal Durum & Hakediş":
     
     st.dataframe(pd.DataFrame(report_list), use_container_width=True)
 
-# --- PAGE 3: INTERIOR WORK ---
-elif app_page == "🏠 أعمال التشطيبات الداخلية (İç Tesisat)":
+# --- PAGE 3: INTERIOR WORK (RESTORED & FIXED) ---
+elif app_page == "🏠 أعمال التشطيبات الداخلية (İç Tesisat)" or app_page == "🏠 İç Mekan İşleri (Alçı & Sıva)":
     st.header("🏠 İç Mekan Alçı, Sıva ve Boya İşleri Kontrolü")
     
     for floor_name in project_structure.keys():
@@ -402,29 +394,23 @@ elif app_page == "🧱 Dış Cephe İşleri":
                 st.write(f"Bölüm İlerlemesi: `%{item['progress']*100:.0f}` | Eşdeğer Alan: `{item['comp_area']:.2f} m²`")
                 st.markdown("---")
 
-# --- PAGE 5: TOILET WORK ---
-elif app_page == "💧 Islak Hacim & Tuvalet İşleri":
-    st.header("💧 Islak Hacim Tesisat ve Seramik Kaplama Kontrolü")
+# --- PAGE 5: TOILET WORK (KARA SIVA ONLY) ---
+elif app_page == "💧 Tuvalet & Islak Hacim (Kara Sıva)":
+    st.header("💧 Tuvalet ve Islak Hacim Kara Sıva Kontrolü")
     
     for floor_name in project_structure.keys():
         toilet_items = [x for x in flat_sections if x["floor"] == floor_name and x["type"] == "toilet"]
         if toilet_items:
-            with st.expander(f"⬇️ {floor_name} - Islak Hacim Barları", expanded=True):
+            with st.expander(f"⬇️ {floor_name} - Kara Sıva İmalatı", expanded=True):
                 c1, c2 = st.columns(2)
                 for i, item in enumerate(toilet_items):
                     g_id = item["global_idx"]
                     col = c1 if i % 2 == 0 else c2
                     with col:
                         st.write(f"##### 💧 {item['section']} ({item['area']:.2f} m²)")
-                        st.checkbox("Temiz/Pis Su Boru Tesisatı [25%]", value=item["p1"], key=f"p_toi_tes_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_toi_tes_{g_id}", f"cb_toi_tes_{g_id}", f"date_toi_tes_{g_id}"))
-                        st.checkbox("Likit Membran Su Yalıtımı (İzolasyon) [20%]", value=item["p2"], key=f"p_toi_izo_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_toi_izo_{g_id}", f"cb_toi_izo_{g_id}", f"date_toi_izo_{g_id}"))
-                        st.checkbox("Seramik / Porselen Yapıştırılması [45%]", value=item["p3"], key=f"p_toi_ser_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_toi_ser_{g_id}", f"cb_toi_ser_{g_id}", f"date_toi_ser_{g_id}"))
-                        st.checkbox("Vitrifiye, Klozet & Duş Montajı [10%]", value=item["p4"], key=f"p_toi_mon_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_toi_mon_{g_id}", f"cb_toi_mon_{g_id}", f"date_toi_mon_{g_id}"))
-                        st.write(f"Bölüm İlerlemesi: `%{item['progress']*100:.0f}` | Eşdeğer Alan: `{item['comp_area']:.2f} m²`")
+                        st.checkbox("Kara Sıva Tamamlandı [%100]", value=item["p1"], key=f"p_toi_ksiva_{g_id}", 
+                                    on_change=handle_checkbox_change, args=(f"p_toi_ksiva_{g_id}", f"cb_toi_ksiva_{g_id}", f"date_toi_ksiva_{g_id}"))
+                        st.write(f"Durum: `{'Tamamlandı' if item['p1'] else 'Bekliyor'}` | Eşdeğer Alan: `{item['comp_area']:.2f} m²`")
                         st.markdown("---")
 
 # --- PAGE 6: TIMELINE LOG ---
