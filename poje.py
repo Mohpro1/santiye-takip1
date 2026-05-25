@@ -7,7 +7,7 @@ from datetime import datetime, date
 # ==========================================
 # 1. PAGE SETUP & CONFIGURATION
 # ==========================================
-st.set_page_config(page_title="Havence - Multi-Page Master System", layout="wide", page_icon="🏗️")
+st.set_page_config(page_title="Havence - Şantiye Takip Sistemi", layout="wide", page_icon="🏗️")
 
 # ==========================================
 # 2. DATA PERSISTENCE ENGINE (JSON DATABASE)
@@ -47,28 +47,28 @@ def handle_checkbox_change(cb_key, save_key, date_key):
             update_state_val(date_key, "")
 
 # ==========================================
-# 3. REPORT GENERATION WRAPPER
+# 3. REPORT GENERATION WRAPPER (TURKISH)
 # ==========================================
 def make_report_wrapper(title, content_html):
     today_str = date.today().strftime('%d.%m.%Y')
     return f"""
     <!DOCTYPE html>
-    <html dir="rtl">
+    <html lang="tr">
     <head>
         <meta charset="utf-8">
         <title>{title}</title>
         <style>
-            body {{ font-family: 'Segoe UI', Arial, sans-serif; color: #333; margin: 30px; line-height: 1.6; text-align: right; }}
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; color: #333; margin: 30px; line-height: 1.6; text-align: left; }}
             .no-print {{ text-align: center; margin-bottom: 25px; }}
             .btn {{ background-color: #1E4620; color: white; padding: 12px 24px; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.15); }}
             .header {{ text-align: center; border-bottom: 3px solid #1E4620; padding-bottom: 15px; margin-bottom: 30px; }}
             .title {{ font-size: 24px; font-weight: bold; color: #1E4620; }}
             .date {{ font-size: 14px; color: #666; margin-top: 5px; }}
-            .grid {{ display: flex; gap: 15px; margin-bottom: 25px; flex-direction: row-reverse; }}
+            .grid {{ display: flex; gap: 15px; margin-bottom: 25px; }}
             .card {{ flex: 1; background: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; text-align: center; }}
             .card-lbl {{ font-size: 12px; font-weight: bold; color: #777; }}
             .card-val {{ font-size: 22px; font-weight: bold; color: #111; margin-top: 5px; }}
-            table {{ width: 100%; border-collapse: collapse; margin-bottom: 25px; text-align: right; }}
+            table {{ width: 100%; border-collapse: collapse; margin-bottom: 25px; text-align: left; }}
             th, td {{ border: 1px solid #dddddd; padding: 12px; font-size: 14px; }}
             th {{ background-color: #f5f5f5; font-weight: bold; color: #111; }}
             tr:nth-child(even) {{ background-color: #fafafa; }}
@@ -78,11 +78,11 @@ def make_report_wrapper(title, content_html):
     </head>
     <body>
         <div class="no-print">
-            <button class="btn" onclick="window.print()">🖨️ حفظ التقرير كـ PDF / طباعة</button>
+            <button class="btn" onclick="window.print()">🖨️ Raporu PDF Olarak Kaydet / Yazdır</button>
         </div>
         <div class="header">
             <div class="title">{title}</div>
-            <div class="date">تاريخ استخراج التقرير: {today_str}</div>
+            <div class="date">Rapor Tarihi: {today_str}</div>
         </div>
         {content_html}
     </body>
@@ -93,37 +93,37 @@ def make_report_wrapper(title, content_html):
 # 4. SIDEBAR NAVIGATION & MASTER PRICES
 # ==========================================
 st.sidebar.image("https://img.icons8.com/clouds/100/000000/building.png", width=80)
-st.sidebar.title("Havence Control")
+st.sidebar.title("Havence Yönetim")
 st.sidebar.markdown("---")
 
 app_page = st.sidebar.radio(
-    "📂 اختر الصفحة المطلوبة:",
+    "📂 Sayfa Seçimi Yapın:",
     [
-        "🏁 حالة المشروع والجدول الزمني",
-        "💰 الميزانية والمستخلصات الشاملة", 
-        "🏠 أعمال التشطيبات الداخلية", 
-        "🧱 أعمال الواجهات الخارجية", 
-        "💧 أعمال الحمامات والمطابخ",
-        "⏱️ سجل الموقع الزمني"
+        "🏁 Proje Durumu & İş Programı",
+        "💰 Genel Finansal Durum & Hakediş", 
+        "🏠 İç Mekan التشطيبات الأعمال (İç Tesisat)", 
+        "🧱 Dış Cephe İşleri", 
+        "💧 Islak Hacim & Tuvalet İşleri",
+        "⏱️ Şantiye Günlüğü & Zaman Çizelgesi"
     ]
 )
 
 st.sidebar.markdown("---")
-st.sidebar.header("⚙️ إعدادات الأسعار (₺/m²)")
+st.sidebar.header("⚙️ Birim Fiyat Ayarları (₺/m²)")
 
-pm_price_int = st.sidebar.number_input("البيع للمالك - داخلي", value=get_state_val("global_pm_price_int", 450.0), step=10.0)
+pm_price_int = st.sidebar.number_input("İşveren Satış - İç Mekan", value=get_state_val("global_pm_price_int", 450.0), step=10.0)
 update_state_val("global_pm_price_int", pm_price_int)
-tech_price_int = st.sidebar.number_input("تكلفة الفني - داخلي", value=get_state_val("global_tech_price_int", 300.0), step=10.0)
+tech_price_int = st.sidebar.number_input("Usta Maliyeti - İç Mekan", value=get_state_val("global_tech_price_int", 300.0), step=10.0)
 update_state_val("global_tech_price_int", tech_price_int)
 
-pm_price_ext = st.sidebar.number_input("البيع للمالك - خارجي", value=get_state_val("global_pm_price_ext", 600.0), step=10.0)
+pm_price_ext = st.sidebar.number_input("İşveren Satış - Dış Cephe", value=get_state_val("global_pm_price_ext", 600.0), step=10.0)
 update_state_val("global_pm_price_ext", pm_price_ext)
-tech_price_ext = st.sidebar.number_input("تكلفة الفني - خارجي", value=get_state_val("global_tech_price_ext", 400.0), step=10.0)
+tech_price_ext = st.sidebar.number_input("Usta Maliyeti - Dış Cephe", value=get_state_val("global_tech_price_ext", 400.0), step=10.0)
 update_state_val("global_tech_price_ext", tech_price_ext)
 
-pm_price_toilet = st.sidebar.number_input("البيع للمالك - حمامات", value=get_state_val("global_pm_price_toilet", 750.0), step=10.0)
+pm_price_toilet = st.sidebar.number_input("İşveren Satış - Islak Hacim", value=get_state_val("global_pm_price_toilet", 750.0), step=10.0)
 update_state_val("global_pm_price_toilet", pm_price_toilet)
-tech_price_toilet = st.sidebar.number_input("تكلفة الفني - حمامات", value=get_state_val("global_tech_price_toilet", 500.0), step=10.0)
+tech_price_toilet = st.sidebar.number_input("Usta Maliyeti - Islak Hacim", value=get_state_val("global_tech_price_toilet", 500.0), step=10.0)
 update_state_val("global_tech_price_toilet", tech_price_toilet)
 
 interior_weights = {"Ano": 0.15, "Alci": 0.40, "Saten": 0.25, "Boya": 0.20}
@@ -131,57 +131,57 @@ exterior_weights = {"Siva": 0.30, "Mantolama": 0.40, "Astar": 0.10, "Boya": 0.20
 toilet_weights = {"Tesisat": 0.25, "Izolasyon": 0.20, "Seramik": 0.45, "Montaj": 0.10}
 
 # ==========================================
-# 5. RESTORED CORRECT DIMENSIONS (OLD APP)
+# 5. FIXED DATA STRUCTURE (OLD APP REGISTER)
 # ==========================================
 project_structure = {
-    "الدور -1 (البدروم السكني والخدمي)": {
-        "دكان -1 (المساحة الصافية)": {"area": 66.71, "type": "interior"},
-        "مخازن البدروم (القطاع الإنشائي)": {"area": 30.22, "type": "interior"},
-        "الطرقة العامة للبدروم": {"area": 50.72, "type": "interior"},
-        "سلم البدروم الداخلي": {"area": 6.96, "type": "interior"},
-        "الشقة الخلفية (الدور السفلي)": {"area": 187.47, "type": "interior"},
-        "حمامات البدروم والخدمات": {"area": 15.50, "type": "toilet"}
+    "Kat -1 (Bodrum Katı)": {
+        "Dükkan -1 (Net Alan)": {"area": 66.71, "type": "interior"},
+        "Bodrum Depoları": {"area": 30.22, "type": "interior"},
+        "Bodrum Ortak Koridor": {"area": 50.72, "type": "interior"},
+        "Bodrum İç Merdiven": {"area": 6.96, "type": "interior"},
+        "Arka Daire (Alt Kat)": {"area": 187.47, "type": "interior"},
+        "Bodrum Lavabo & WC": {"area": 15.50, "type": "toilet"}
     },
-    "دور المدخل الأرضي": {
-        "المدخل الرئيسي والممر الطولي": {"area": 24.32, "type": "interior"},
-        "الطرقة العامة والصالة الأرضية": {"area": 50.38, "type": "interior"},
-        "سلم الدور الأرضي": {"area": 6.96, "type": "interior"},
-        "الدكان الأرضي الصافي": {"area": 24.06, "type": "interior"},
-        "الشقة الخلفية الأرضية": {"area": 106.56, "type": "interior"},
-        "حمامات الشقة الأرضية والدكان": {"area": 12.20, "type": "toilet"}
+    "Zemin Giriş Katı": {
+        "Ana Giriş & Uzun Hol": {"area": 24.32, "type": "interior"},
+        "Ortak Koridor & Zemin Salon": {"area": 50.38, "type": "interior"},
+        "Zemin Kat Merdiveni": {"area": 6.96, "type": "interior"},
+        "Net Zemin Dükkan": {"area": 24.06, "type": "interior"},
+        "Arka Zemin Daire": {"area": 106.56, "type": "interior"},
+        "Zemin Daire & Dükkan Tuvaletleri": {"area": 12.20, "type": "toilet"}
     },
-    "الدور المتكرر الأول": {
-        "الشقة الأمامية (1)": {"area": 163.17, "type": "interior"},
-        "الشقة الخلفية (1)": {"area": 106.56, "type": "interior"},
-        "السلم العام والطرقة (1)": {"area": 50.76, "type": "interior"},
-        "حمامات الشقة الأمامية (1)": {"area": 18.40, "type": "toilet"},
-        "حمامات الشقة الخلفية (1)": {"area": 14.20, "type": "toilet"}
+    "Normal Kat 1": {
+        "Ön Daire (1)": {"area": 163.17, "type": "interior"},
+        "Arka Daire (1)": {"area": 106.56, "type": "interior"},
+        "Ortak Merdiven & Hol (1)": {"area": 50.76, "type": "interior"},
+        "Ön Daire Tuvaletleri (1)": {"area": 18.40, "type": "toilet"},
+        "Arka Daire Tuvaletleri (1)": {"area": 14.20, "type": "toilet"}
     },
-    "الدور المتكرر الثاني": {
-        "الشقة الأمامية (2)": {"area": 163.17, "type": "interior"},
-        "الشقة الخلفية (2)": {"area": 106.56, "type": "interior"},
-        "السلم العام والطرقة (2)": {"area": 50.76, "type": "interior"},
-        "حمامات الشقة الأمامية (2)": {"area": 18.40, "type": "toilet"},
-        "حمامات الشقة الخلفية (2)": {"area": 14.20, "type": "toilet"}
+    "Normal Kat 2": {
+        "Ön Daire (2)": {"area": 163.17, "type": "interior"},
+        "Arka Daire (2)": {"area": 106.56, "type": "interior"},
+        "Ortak Merdiven & Hol (2)": {"area": 50.76, "type": "interior"},
+        "Ön Daire Tuvaletleri (2)": {"area": 18.40, "type": "toilet"},
+        "Arka Daire Tuvaletleri (2)": {"area": 14.20, "type": "toilet"}
     },
-    "الدور المتكرر الثالث": {
-        "الشقة الأمامية (3)": {"area": 163.17, "type": "interior"},
-        "الشقة الخلفية (3)": {"area": 106.56, "type": "interior"},
-        "السلم العام والطرقة (3)": {"area": 50.76, "type": "interior"},
-        "حمامات الشقة الأمامية (3)": {"area": 18.40, "type": "toilet"},
-        "حمامات الشقة الخلفية (3)": {"area": 14.20, "type": "toilet"}
+    "Normal Kat 3": {
+        "Ön Daire (3)": {"area": 163.17, "type": "interior"},
+        "Arka Daire (3)": {"area": 106.56, "type": "interior"},
+        "Ortak Merdiven & Hol (3)": {"area": 50.76, "type": "interior"},
+        "Ön Daire Tuvaletleri (3)": {"area": 18.40, "type": "toilet"},
+        "Arka Daire Tuvaletleri (3)": {"area": 14.20, "type": "toilet"}
     },
-    "الدور الأخير (الدوبلكس / الملحق)": {
-        "الشقة الأمامية الأخير": {"area": 163.17, "type": "interior"},
-        "الشقة الخلفية الأخير": {"area": 106.56, "type": "interior"},
-        "السلم والمسارات للأخير": {"area": 50.76, "type": "interior"},
-        "حمامات الشقة الدوبلكس": {"area": 22.60, "type": "toilet"}
+    "Son Kat (Dublex / Çatı Katı)": {
+        "Son Kat Ön Daire": {"area": 163.17, "type": "interior"},
+        "Son Kat Arka Daire": {"area": 106.56, "type": "interior"},
+        "Son Kat Merdiven & Geçişler": {"area": 50.76, "type": "interior"},
+        "Dublex Daire Tuvaletleri": {"area": 22.60, "type": "toilet"}
     },
-    "الواجهات الخارجية للمبنى": {
-        "الواجهة الأمامية الرئيسية": {"area": 280.00, "type": "exterior"},
-        "الواجهة الخلفية": {"area": 240.00, "type": "exterior"},
-        "الجانب الأيمن (Yan Cephe)": {"area": 200.00, "type": "exterior"}, # الارتفاع والمسارات القديمة الصحيحة
-        "الجانب الأيسر": {"area": 200.00, "type": "exterior"}
+    "Binanın Dış Cepheleri": {
+        "Ana Ön Cephe": {"area": 280.00, "type": "exterior"},
+        "Arka Cephe": {"area": 240.00, "type": "exterior"},
+        "Sağ Yan Cephe": {"area": 200.00, "type": "exterior"}, 
+        "Sol Yan Cephe": {"area": 200.00, "type": "exterior"}
     }
 }
 
@@ -211,7 +211,7 @@ for floor_name, sections in project_structure.items():
                             (interior_weights["Boya"] if p4 else 0))
             current_pm = pm_price_int
             current_tech = tech_price_int
-            phases = [("int_ano", "البؤج (Ano)"), ("int_alc", "المحارة (Alçı)"), ("int_sat", "المعجون (Saten)"), ("int_boy", "الدهان (Boya)")]
+            phases = [("int_ano", "Ano Çıtası"), ("int_alc", "Alçı Sıva"), ("int_sat", "Saten Alçı"), ("int_boy", "İç Cephe Boya")]
             
         elif sec_type == "exterior":
             p1 = get_state_val(f"cb_ext_siva_{global_idx}", False)
@@ -224,7 +224,7 @@ for floor_name, sections in project_structure.items():
                             (exterior_weights["Boya"] if p4 else 0))
             current_pm = pm_price_ext
             current_tech = tech_price_ext
-            phases = [("ext_siva", "المحارة الخارجية"), ("ext_mant", "العزل الحراري"), ("ext_ast", "الآستار"), ("ext_boy", "دهان الواجهة")]
+            phases = [("ext_siva", "Kaba Sıva"), ("ext_mant", "Mantolama"), ("ext_ast", "Dış Cephe Astar"), ("ext_boy", "Dış Cephe Boya")]
             
         else: # toilet
             p1 = get_state_val(f"cb_toi_tes_{global_idx}", False)
@@ -237,7 +237,7 @@ for floor_name, sections in project_structure.items():
                             (toilet_weights["Montaj"] if p4 else 0))
             current_pm = pm_price_toilet
             current_tech = tech_price_toilet
-            phases = [("toi_tes", "السباكة والتأسيس"), ("toi_izo", "العزل المائي"), ("toi_ser", "تركيب السيراميك"), ("toi_mon", "القطع الصحية")]
+            phases = [("toi_tes", "Sıhhi Tesisat"), ("toi_izo", "Su Yalıtımı"), ("toi_ser", "Seramik Kaplama"), ("toi_mon", "Vitrifiye Montajı")]
 
         completed_area = area * sec_progress
         total_project_area += area
@@ -260,20 +260,20 @@ overall_progress_pct = (total_completed_equivalent_area / total_project_area) if
 # ==========================================
 
 # --- PAGE 1: START, END & PROJECT SCHEDULE TRACKING ---
-if app_page == "🏁 حالة المشروع والجدول الزمني":
-    st.header("🏁 متابعة تواريخ تنفيذ المشروع والجدول المخطط له")
+if app_page == "🏁 Proje Durumu & İş Programı":
+    st.header("🏁 Proje Başlangıç/Bitiş Tarihleri & Planlanan Zaman Takibi")
     
     col_t1, col_t2 = st.columns(2)
     with col_t1:
-        start_date = st.date_input("🗓️ تاريخ بداية المشروع الفعلي:", value=datetime.strptime(get_state_val("proj_start_date", "2026-01-01"), "%Y-%m-%d").date())
+        start_date = st.date_input("🗓️ Proje Fiili Başlangıç Tarihi:", value=datetime.strptime(get_state_val("proj_start_date", "2026-01-01"), "%Y-%m-%d").date())
         update_state_val("proj_start_date", start_date.strftime("%Y-%m-%d"))
     with col_t2:
-        end_date = st.date_input("🗓️ التاريخ المستهدف لتسليم المشروع:", value=datetime.strptime(get_state_val("proj_end_date", "2026-08-01"), "%Y-%m-%d").date())
+        end_date = st.date_input("🗓️ Hedeflenen Proje Bitiş Tarihi:", value=datetime.strptime(get_state_val("proj_end_date", "2026-08-01"), "%Y-%m-%d").date())
         update_state_val("proj_end_date", end_date.strftime("%Y-%m-%d"))
         
     st.markdown("---")
     
-    # احتساب الفروق الزمنية وحالة المخطط
+    # Zaman hesabı
     today_dt = date.today()
     total_days = (end_date - start_date).days
     days_passed = (today_dt - start_date).days
@@ -285,51 +285,50 @@ if app_page == "🏁 حالة المشروع والجدول الزمني":
         
     actual_progress_pct = overall_progress_pct * 100
     
-    st.subheader("📊 مقارنة خطة العمل بالواقع الميداني")
+    st.subheader("📊 İş Programı Karşılaştırma Analizi")
     c_m1, c_m2, c_m3 = st.columns(3)
-    c_m1.metric("النسبة الفعلية الحالية بالموقع", f"{actual_progress_pct:.2f}%")
-    c_m2.metric("النسبة المستهدفة حسب الجدول اليوم", f"{expected_progress_pct:.2f}%")
+    c_m1.metric("Şantiyedeki Gerçek İlerleme", f"%{actual_progress_pct:.2f}")
+    c_m2.metric("Zaman Göre Olması Gereken", f"%{expected_progress_pct:.2f}")
     
-    # تحديد الحالة: On Schedule أو Delayed
     if actual_progress_pct >= expected_progress_pct:
-        c_m3.success("🟢 On Schedule (منضبط)")
+        c_m3.success("🟢 On Schedule (Zamanlamaya Uygun)")
         st.balloons()
     else:
-        c_m3.error("🔴 Delayed (يوجد تأخير)")
+        c_m3.error("🔴 Delayed (Gecikme Var)")
         
     st.markdown("---")
-    st.info(f"💡 إجمالي الأيام المخصصة للمشروع: `{total_days}` يوماً | الأيام المنقضية حتى اليوم: `{max(0, days_passed)}` يوماً.")
+    st.info(f"💡 Toplam Ayrılan Süre: `{total_days}` Gün | Bugüne Kadar Geçen Süre: `{max(0, days_passed)}` Gün.")
 
 # --- PAGE 2: MONEY & TOTAL DASHBOARD ---
-elif app_page == "💰 الميزانية والمستخلصات الشاملة":
-    st.header("💰 الحسابات المالية الإجمالية للمشروع")
-    st.markdown(f"#### 📊 النسبة الكلية المكتملة للموقع: `{overall_progress_pct*100:.2f}%`")
+elif app_page == "💰 Genel Finansal Durum & Hakediş":
+    st.header("💰 Şantiye Finansal Raporları & Toplam Kar/Zarar")
+    st.markdown(f"#### 📊 Toplam Şantiye Tamamlanma Oranı: `%{overall_progress_pct*100:.2f}`")
     
     col_a, col_b, col_c = st.columns(3)
-    col_a.metric("مستخلص المالك (المعتمد)", f"₺ {total_billing_owner:,.2f}")
-    col_b.metric("أجور ومستحقات الفنيين", f"₺ {total_labor_cost:,.2f}")
-    col_c.metric("صافي الأرباح (Havence)", f"₺ {total_billing_owner - total_labor_cost:,.2f}")
+    col_a.metric("İşverenden Alınacak Toplam Hakediş", f"₺ {total_billing_owner:,.2f}")
+    col_b.metric("Ustalara Ödenecek Toplam Maliyet", f"₺ {total_labor_cost:,.2f}")
+    col_c.metric("Havence Net Kar", f"₺ {total_billing_owner - total_labor_cost:,.2f}")
     
     st.markdown("---")
     
     table_rows_html = ""
     report_list = []
-    type_map = {"interior": "داخلي", "exterior": "خارجي/واجهات", "toilet": "حمامات"}
+    type_map = {"interior": "İç Mekan", "exterior": "Dış Cephe", "toilet": "Islak Hacim"}
     
     for item in flat_sections:
         sec_bill = item["comp_area"] * item["pm_price"]
         sec_cost = item["comp_area"] * item["tech_price"]
         
         report_list.append({
-            "الموقع/الدور": item["floor"], "البند": item["section"], "الفئة": type_map[item["type"]],
-            "المساحة": f"{item['area']:.2f} م²", "الإنجاز": f"{item['progress']*100:.0f}%",
-            "حساب المالك": f"₺ {sec_bill:,.2f}", "حساب الفني": f"₺ {sec_cost:,.2f}"
+            "Kat / Bölge": item["floor"], "Bölüm": item["section"], "Kategori": type_map[item["type"]],
+            "Alan": f"{item['area']:.2f} m²", "İlerleme": f"%{item['progress']*100:.0f}",
+            "İşveren Hakediş": f"₺ {sec_bill:,.2f}", "Usta Maliyeti": f"₺ {sec_cost:,.2f}"
         })
         
         table_rows_html += f"""
         <tr>
             <td>{item['floor']}</td><td>{item['section']}</td><td>{type_map[item['type']]}</td>
-            <td>{item['area']:.2f} م²</td><td>{item['progress']*100:.0f}%</td>
+            <td>{item['area']:.2f} m²</td><td>%{item['progress']*100:.0f}</td>
             <td>₺ {sec_bill:,.2f}</td><td>₺ {sec_cost:,.2f}</td>
         </tr>
         """
@@ -337,52 +336,52 @@ elif app_page == "💰 الميزانية والمستخلصات الشاملة"
     html_content = f"""
     <table>
         <thead>
-            <tr><th>الدور</th><th>القطاع</th><th>الفئة</th><th>المساحة</th><th>نسبة الإنجاز</th><th>مستخلص المالك</th><th>أجرة الفني</th></tr>
+            <tr><th>Kat/Bölge</th><th>Bölüm</th><th>Kategori</th><th>Metraj</th><th>İlerleme %</th><th>İşveren Hakediş</th><th>Usta Maliyeti</th></tr>
         </thead>
         <tbody>
             {table_rows_html}
             <tr class="total">
-                <td colspan="3">المجموع الإجمالي</td><td>{total_project_area:,.2f} م²</td><td>{overall_progress_pct*100:.2f}%</td>
+                <td colspan="3">Genel Toplam</td><td>{total_project_area:,.2f} m²</td><td>%{overall_progress_pct*100:.2f}</td>
                 <td>₺ {total_billing_owner:,.2f}</td><td>₺ {total_labor_cost:,.2f}</td>
             </tr>
         </tbody>
     </table>
     """
     
-    st.download_button("🖨️ تحميل مستخلص المشروع الشامل بصيغة PDF/HTML", 
-                       make_report_wrapper("تقرير الحسابات الموحد - Havence", html_content), 
-                       file_name="Havence_Financial_Report.html", mime="text/html")
+    st.download_button("🖨️ Kapsamlı Şantiye Hakediş Raporunu İndir (PDF/HTML)", 
+                       make_report_wrapper("Havence - Şantiye Hakediş ve Finansal Raporu", html_content), 
+                       file_name="Havence_Finansal_Hakedis_Raporu.html", mime="text/html")
     
     st.dataframe(pd.DataFrame(report_list), use_container_width=True)
 
 # --- PAGE 3: INTERIOR WORK ---
-elif app_page == "🏠 أعمال التشطيبات الداخلية":
-    st.header("🏠 إدارة ومتابعة التشطيبات الداخلية (İç Mekan)")
+elif app_page == "🏠 أعمال التشطيبات الداخلية (İç Tesisat)":
+    st.header("🏠 İç Mekan Alçı, Sıva ve Boya İşleri Kontrolü")
     
     for floor_name in project_structure.keys():
         interior_items = [x for x in flat_sections if x["floor"] == floor_name and x["type"] == "interior"]
         if interior_items:
-            with st.expander(f"⬇️ {floor_name} - القطاعات الداخلية", expanded=True):
+            with st.expander(f"⬇️ {floor_name} - İç Mekan İmalatları", expanded=True):
                 c1, c2 = st.columns(2)
                 for i, item in enumerate(interior_items):
                     g_id = item["global_idx"]
                     col = c1 if i % 2 == 0 else c2
                     with col:
-                        st.write(f"##### 📍 {item['section']} ({item['area']:.2f} م²)")
-                        st.checkbox("البؤج والأوتار (Ano) [15%]", value=item["p1"], key=f"p_int_ano_{g_id}", 
+                        st.write(f"##### 📍 {item['section']} ({item['area']:.2f} m²)")
+                        st.checkbox("Ano Çıtası Çakılması [15%]", value=item["p1"], key=f"p_int_ano_{g_id}", 
                                     on_change=handle_checkbox_change, args=(f"p_int_ano_{g_id}", f"cb_int_ano_{g_id}", f"date_int_ano_{g_id}"))
-                        st.checkbox("المحارة والجبس (Alçı) [40%]", value=item["p2"], key=f"p_int_alc_{g_id}", 
+                        st.checkbox("Makine Alçı Sıva Yapılması [40%]", value=item["p2"], key=f"p_int_alc_{g_id}", 
                                     on_change=handle_checkbox_change, args=(f"p_int_alc_{g_id}", f"cb_int_alc_{g_id}", f"date_int_alc_{g_id}"))
-                        st.checkbox("المعجون الناعم (Saten) [25%]", value=item["p3"], key=f"p_int_sat_{g_id}", 
+                        st.checkbox("Saten Alçı & Zımpara Hazırlık [25%]", value=item["p3"], key=f"p_int_sat_{g_id}", 
                                     on_change=handle_checkbox_change, args=(f"p_int_sat_{g_id}", f"cb_int_sat_{g_id}", f"date_int_sat_{g_id}"))
-                        st.checkbox("الدهان وجه أخير (Boya) [20%]", value=item["p4"], key=f"p_int_boy_{g_id}", 
+                        st.checkbox("Son Kat Boya Uygulaması [20%]", value=item["p4"], key=f"p_int_boy_{g_id}", 
                                     on_change=handle_checkbox_change, args=(f"p_int_boy_{g_id}", f"cb_int_boy_{g_id}", f"date_int_boy_{g_id}"))
-                        st.write(f"نسبة الإنجاز: `{item['progress']*100:.0f}%` | أمتار مكافئة: `{item['comp_area']:.2f} م²`")
+                        st.write(f"Bölüm İlerlemesi: `%{item['progress']*100:.0f}` | Eşdeğer Alan: `{item['comp_area']:.2f} m²`")
                         st.markdown("---")
 
 # --- PAGE 4: EXTERIOR WORK ---
-elif app_page == "🧱 أعمال الواجهات الخارجية":
-    st.header("🧱 إدارة ومتابعة أعمال الواجهات والـ Dış Cephe")
+elif app_page == "🧱 Dış Cephe İşleri":
+    st.header("🧱 Dış Cephe Yalıtım ve Boya İmalatları (Mantolama)")
     
     exterior_items = [x for x in flat_sections if x["type"] == "exterior"]
     if exterior_items:
@@ -391,46 +390,46 @@ elif app_page == "🧱 أعمال الواجهات الخارجية":
             g_id = item["global_idx"]
             col = c1 if i % 2 == 0 else c2
             with col:
-                st.write(f"##### 🧱 {item['section']} ({item['area']:.2f} م²)")
-                st.checkbox("المحارة الخارجية (Sıva) [30%]", value=item["p1"], key=f"p_ext_siva_{g_id}", 
+                st.write(f"##### 🧱 {item['section']} ({item['area']:.2f} m²)")
+                st.checkbox("Kaba Sıva Uygulaması [30%]", value=item["p1"], key=f"p_ext_siva_{g_id}", 
                             on_change=handle_checkbox_change, args=(f"p_ext_siva_{g_id}", f"cb_ext_siva_{g_id}", f"date_ext_siva_{g_id}"))
-                st.checkbox("العزل الحراري (Mantolama) [40%]", value=item["p2"], key=f"p_ext_mant_{g_id}", 
+                st.checkbox("Mantolama (Isı Yalıtım Levhası & Dübel) [40%]", value=item["p2"], key=f"p_ext_mant_{g_id}", 
                             on_change=handle_checkbox_change, args=(f"p_ext_mant_{g_id}", f"cb_ext_mant_{g_id}", f"date_ext_mant_{g_id}"))
-                st.checkbox("الجه التحضيري (Astar) [10%]", value=item["p3"], key=f"p_ext_ast_{g_id}", 
+                st.checkbox("Dış Cephe Macun & Astar [10%]", value=item["p3"], key=f"p_ext_ast_{g_id}", 
                             on_change=handle_checkbox_change, args=(f"p_ext_ast_{g_id}", f"cb_ext_ast_{g_id}", f"date_ext_ast_{g_id}"))
-                st.checkbox("الدهان الخارجي (Boya) [20%]", value=item["p4"], key=f"p_ext_boy_{g_id}", 
+                st.checkbox("Dış Cephe Grenli/Düz Boya [20%]", value=item["p4"], key=f"p_ext_boy_{g_id}", 
                             on_change=handle_checkbox_change, args=(f"p_ext_boy_{g_id}", f"cb_ext_boy_{g_id}", f"date_ext_boy_{g_id}"))
-                st.write(f"نسبة الإنجاز: `{item['progress']*100:.0f}%` | أمتار مكافئة: `{item['comp_area']:.2f} م²`")
+                st.write(f"Bölüm İlerlemesi: `%{item['progress']*100:.0f}` | Eşdeğer Alan: `{item['comp_area']:.2f} m²`")
                 st.markdown("---")
 
 # --- PAGE 5: TOILET WORK ---
-elif app_page == "💧 أعمال الحمامات والمطابخ":
-    st.header("💧 إدارة ومتابعة عزل وتأسيس الحمامات والمطابخ")
+elif app_page == "💧 Islak Hacim & Tuvalet İşleri":
+    st.header("💧 Islak Hacim Tesisat ve Seramik Kaplama Kontrolü")
     
     for floor_name in project_structure.keys():
         toilet_items = [x for x in flat_sections if x["floor"] == floor_name and x["type"] == "toilet"]
         if toilet_items:
-            with st.expander(f"⬇️ {floor_name} - شبكة الحمامات والخدمات", expanded=True):
+            with st.expander(f"⬇️ {floor_name} - Islak Hacim Barları", expanded=True):
                 c1, c2 = st.columns(2)
                 for i, item in enumerate(toilet_items):
                     g_id = item["global_idx"]
                     col = c1 if i % 2 == 0 else c2
                     with col:
-                        st.write(f"##### 💧 {item['section']} ({item['area']:.2f} م²)")
-                        st.checkbox("تأسيس السباكة والتغذية (Tesisat) [25%]", value=item["p1"], key=f"p_toi_tes_{g_id}", 
+                        st.write(f"##### 💧 {item['section']} ({item['area']:.2f} m²)")
+                        st.checkbox("Temiz/Pis Su Boru Tesisatı [25%]", value=item["p1"], key=f"p_toi_tes_{g_id}", 
                                     on_change=handle_checkbox_change, args=(f"p_toi_tes_{g_id}", f"cb_toi_tes_{g_id}", f"date_toi_tes_{g_id}"))
-                        st.checkbox("العزل المائي والطبقات (İzolasyon) [20%]", value=item["p2"], key=f"p_toi_izo_{g_id}", 
+                        st.checkbox("Likit Membran Su Yalıtımı (İzolasyon) [20%]", value=item["p2"], key=f"p_toi_izo_{g_id}", 
                                     on_change=handle_checkbox_change, args=(f"p_toi_izo_{g_id}", f"cb_toi_izo_{g_id}", f"date_toi_izo_{g_id}"))
-                        st.checkbox("السيراميك والبورسلان (Seramik) [45%]", value=item["p3"], key=f"p_toi_ser_{g_id}", 
+                        st.checkbox("Seramik / Porselen Yapıştırılması [45%]", value=item["p3"], key=f"p_toi_ser_{g_id}", 
                                     on_change=handle_checkbox_change, args=(f"p_toi_ser_{g_id}", f"cb_toi_ser_{g_id}", f"date_toi_ser_{g_id}"))
-                        st.checkbox("تركيب الفينش والقطع الصحية (Montaj) [10%]", value=item["p4"], key=f"p_toi_mon_{g_id}", 
+                        st.checkbox("Vitrifiye, Klozet & Duş Montajı [10%]", value=item["p4"], key=f"p_toi_mon_{g_id}", 
                                     on_change=handle_checkbox_change, args=(f"p_toi_mon_{g_id}", f"cb_toi_mon_{g_id}", f"date_toi_mon_{g_id}"))
-                        st.write(f"نسبة الإنجاز: `{item['progress']*100:.0f}%` | أمتار مكافئة: `{item['comp_area']:.2f} م²`")
+                        st.write(f"Bölüm İlerlemesi: `%{item['progress']*100:.0f}` | Eşdeğer Alan: `{item['comp_area']:.2f} m²`")
                         st.markdown("---")
 
 # --- PAGE 6: TIMELINE LOG ---
-elif app_page == "⏱️ سجل الموقع الزمني":
-    st.header("⏱️ الخط الزمني ومواعيد تسليم المراحل الفنية")
+elif app_page == "⏱️ Şantiye Günlüğü & Zaman Çizelgesi":
+    st.header("⏱️ Şantiyede Tamamlanan İmalatların Zaman Çizelgesi")
     
     timeline_events = []
     for item in flat_sections:
@@ -439,14 +438,14 @@ elif app_page == "⏱️ سجل الموقع الزمني":
             d = get_state_val(f"date_{phase_code}_{g_id}", "")
             if d:
                 timeline_events.append({
-                    "التاريخ": d, "الدور / الموقع": item["floor"], "البند الفني": item["section"], "المرحلة": phase_name
+                    "Tarih": d, "Kat / Lokasyon": item["floor"], "İmalat Kalemi": item["section"], "Yapılan Aşama": phase_name
                 })
                 
     if timeline_events:
         df_time = pd.DataFrame(timeline_events)
-        df_time['dt_parse'] = pd.to_datetime(df_time['التاريخ'], format='%d.%m.%Y')
+        df_time['dt_parse'] = pd.to_datetime(df_time['Tarih'], format='%d.%m.%Y')
         df_time = df_time.sort_values(by='dt_parse', ascending=False).drop(columns=['dt_parse'])
         
         st.dataframe(df_time, use_container_width=True)
     else:
-        st.info("لم يتم إنجاز أو وضع علامة تنفيذ على أي مرحلة في أي صفحة حتى الآن.")
+        st.info("Henüz şantiyede tamamlanan herhangi bir imalat adımı işaretlenmemiştir.")
