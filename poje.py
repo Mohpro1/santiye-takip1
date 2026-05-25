@@ -8,7 +8,7 @@ from datetime import datetime, date
 # 1. PAGE SETUP & CONFIGURATION
 # ==========================================
 st.set_page_config(page_title="Havence - Total Progress Dashboard", layout="wide", page_icon="🏗️")
-st.title("🏗️ Havence - المنظومة الشاملة لمتابعة التشطيبات (داخلي - خارجي - حمامات)")
+st.title("🏗️ Havence - منظومة حصر ومتابعة التشطيبات الشاملة في تركيا")
 
 # ==========================================
 # 2. DATA PERSISTENCE ENGINE (JSON DATABASE)
@@ -91,37 +91,36 @@ def make_report_wrapper(title, content_html):
     """
 
 # ==========================================
-# 4. SIDEBAR - FINANCIAL SETTINGS BY CATEGORY
+# 4. SIDEBAR - FINANCIAL SETTINGS & CRITERIA
 # ==========================================
 st.sidebar.header("💵 إعدادات فئات أسعار المتر المربع")
 
-st.sidebar.subheader("🏢 أعمال التشطيبات الداخلية")
+st.sidebar.subheader("🏠 أعمال التشطيبات الداخلية (İç Tesisat)")
 pm_price_int = st.sidebar.number_input("سعر البيع للمالك - داخلي (₺/m²)", value=get_state_val("global_pm_price_int", 450.0), step=10.0)
 update_state_val("global_pm_price_int", pm_price_int)
 tech_price_int = st.sidebar.number_input("تكلفة الفني - داخلي (₺/m²)", value=get_state_val("global_tech_price_int", 300.0), step=10.0)
 update_state_val("global_tech_price_int", tech_price_int)
 
-st.sidebar.subheader("📐 أعمال الواجهات الخارجية")
+st.sidebar.subheader("🧱 أعمال الواجهات الخارجية (Dış Cephe)")
 pm_price_ext = st.sidebar.number_input("سعر البيع للمالك - خارجي (₺/m²)", value=get_state_val("global_pm_price_ext", 600.0), step=10.0)
 update_state_val("global_pm_price_ext", pm_price_ext)
 tech_price_ext = st.sidebar.number_input("تكلفة الفني - خارجي (₺/m²)", value=get_state_val("global_tech_price_ext", 400.0), step=10.0)
 update_state_val("global_tech_price_ext", tech_price_ext)
 
-st.sidebar.subheader("🚽 أعمال الحمامات والمطابخ")
+st.sidebar.subheader("💧 أعمال الحمامات والمطابخ (Islak Hacim)")
 pm_price_toilet = st.sidebar.number_input("سعر البيع للمالك - حمامات (₺/m²)", value=get_state_val("global_pm_price_toilet", 750.0), step=10.0)
 update_state_val("global_pm_price_toilet", pm_price_toilet)
 tech_price_toilet = st.sidebar.number_input("تكلفة الفني - حمامات (₺/m²)", value=get_state_val("global_tech_price_toilet", 500.0), step=10.0)
 update_state_val("global_tech_price_toilet", tech_price_toilet)
 
-# الأوزان النسبية الهندسية لكل فئة تشغيل
+# الأوزان النسبية المستحقة هندسياً لكل نوع عمل
 interior_weights = {"Ano": 0.15, "Alci": 0.40, "Saten": 0.25, "Boya": 0.20}
 exterior_weights = {"Siva": 0.30, "Mantolama": 0.40, "Astar": 0.10, "Boya": 0.20}
 toilet_weights = {"Tesisat": 0.25, "Izolasyon": 0.20, "Seramik": 0.45, "Montaj": 0.10}
 
 # ==========================================
-# 5. EXPANDED QUANTITY SURVEYING STRUCTURE
+# 5. INTEGRATED PROJECT STRUCTURE
 # ==========================================
-# تم إضافة بنود الواجهات (خارجي) والحمامات بشكل مستقل بجانب المسارات الداخلية
 project_structure = {
     "الدور -1 (البدروم السكني والخدمي)": {
         "دكان -1 (المساحة الصافية)": {"area": 66.71, "type": "interior"},
@@ -169,7 +168,7 @@ project_structure = {
     "الواجهات الخارجية للمبنى": {
         "الواجهة الأمامية الرئيسية": {"area": 280.00, "type": "exterior"},
         "الواجهة الخلفية": {"area": 240.00, "type": "exterior"},
-        "الجانب الأيمن (Yan Cephe)": {"area": 200.00, "type": "exterior"},
+        "الجانب الأيمن (Yan Cephe)": {"area": 20.00 * 10.00, "type": "exterior"},  # معتمد بارتفاع 20 متر صافي الحصر
         "الجانب الأيسر": {"area": 200.00, "type": "exterior"}
     }
 }
@@ -190,7 +189,6 @@ for floor_name, sections in project_structure.items():
         area = info["area"]
         sec_type = info["type"]
         
-        # حساب نسب الإنجاز حسب نوع القطاع
         if sec_type == "interior":
             p1 = get_state_val(f"cb_int_ano_{global_idx}", False)
             p2 = get_state_val(f"cb_int_alc_{global_idx}", False)
@@ -215,7 +213,7 @@ for floor_name, sections in project_structure.items():
                             (exterior_weights["Boya"] if p4 else 0))
             current_pm = pm_price_ext
             current_tech = tech_price_ext
-            phases = [("ext_siva", "المحارة الخارجية"), ("ext_mant", "العزل الحراري"), ("ext_ast", "الآستار"), ("ext_boy", "دهان الواجهة")]
+            phases = [("ext_siva", "المحارة الخارجية (Kaba Sıva)"), ("ext_mant", "العزل الحراري (Mantolama)"), ("ext_ast", "الآستار (Astar)"), ("ext_boy", "دهان الواجهة (Boyama)")]
             
         else: # toilet
             p1 = get_state_val(f"cb_toi_tes_{global_idx}", False)
@@ -228,13 +226,12 @@ for floor_name, sections in project_structure.items():
                             (toilet_weights["Montaj"] if p4 else 0))
             current_pm = pm_price_toilet
             current_tech = tech_price_toilet
-            phases = [("toi_tes", "السباكة والتأسيس"), ("toi_izo", "العزل المائي"), ("toi_ser", "تركيب السيراميك"), ("toi_mon", "القطع الصحية")]
+            phases = [("toi_tes", "السباكة والتأسيس"), ("toi_izo", "العزل المائي"), ("toi_ser", "تركيب السيراميك والبورسلان"), ("toi_mon", "القطع الصحية والدوش")]
 
         completed_area = area * sec_progress
         total_project_area += area
         total_completed_equivalent_area += completed_area
         
-        # الحسابات المالية التراكمية بناءً على الفئة
         total_billing_owner += completed_area * current_pm
         total_labor_cost += completed_area * current_tech
         
@@ -277,7 +274,7 @@ st.markdown(f"### 📊 النسبة الإجمالية المكتملة للمش
 
 tab_money, tab_floors, tab_timeline = st.tabs([
     "💰 الحسابات والمستخلصات المالية الشاملة", 
-    "🏢 متابعة غرف وقطاعات وواجهات المشروع", 
+    "🏢 متابعة غرف وقطاعات وواجهات المشروع تفصيلياً", 
     "⏱️ السجل الزمني الحي للموقع"
 ])
 
@@ -300,7 +297,7 @@ with tab_money:
         sec_cost = item["comp_area"] * item["tech_price"]
         sec_profit = sec_billing - sec_cost
         
-        type_mapping = {"interior": "داخلي", "exterior": "خارجي/واجهات", "toilet": "حمامات/خدمات"}
+        type_mapping = {"interior": "داخلي (İç)", "exterior": "خارجي (Dış)", "toilet": "حمامات (Islak)"}
         
         report_data_list.append({
             "الدور / الموقع": item["floor"],
@@ -364,9 +361,9 @@ with tab_money:
     
     st.dataframe(pd.DataFrame(report_data_list), use_container_width=True)
 
-# --- TAB 2: DETAILED PROGRESS TRACKING BY FLOORS ---
+# --- TAB 2: PROGRESS TRACKING & SECTIONS ---
 with tab_floors:
-    st.header("🏢 أدوار وواجهات المشروع التفصيلية")
+    st.header("🏢 تفاصيل بنود وأقسام الموقع الميداني")
     
     for floor_name, sections in project_structure.items():
         with st.expander(f"⬇️ {floor_name}", expanded=True):
@@ -378,10 +375,9 @@ with tab_floors:
                 target_col = col1 if idx % 2 == 0 else col2
                 
                 with target_col:
-                    badge = "🏠" if item["type"] == "interior" else "🧱" if item["type"] == "exterior" else "💧"
+                    badge = "🏠 [داخلي]" if item["type"] == "interior" else "🧱 [خارجي]" if item["type"] == "exterior" else "💧 [حمامات]"
                     st.write(f"##### {badge} {item['section']} ({item['area']:.2f} م²)")
                     
-                    # عرض الحقول المناسبة ديناميكياً حسب نوع القطاع
                     if item["type"] == "interior":
                         st.checkbox("البؤج والأوتار (Ano) [15%]", value=item["p1"], key=f"p_int_ano_{g_id}", 
                                     on_change=handle_checkbox_change, args=(f"p_int_ano_{g_id}", f"cb_int_ano_{g_id}", f"date_int_ano_{g_id}"))
