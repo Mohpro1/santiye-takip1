@@ -7,8 +7,7 @@ from datetime import datetime, date
 # ==========================================
 # 1. PAGE SETUP & CONFIGURATION
 # ==========================================
-st.set_page_config(page_title="Havence - Total Progress Dashboard", layout="wide", page_icon="🏗️")
-st.title("🏗️ Havence - منظومة حصر ومتابعة التشطيبات الشاملة في تركيا")
+st.set_page_config(page_title="Havence - Multi-Page Dashboard", layout="wide", page_icon="🏗️")
 
 # ==========================================
 # 2. DATA PERSISTENCE ENGINE (JSON DATABASE)
@@ -48,7 +47,7 @@ def handle_checkbox_change(cb_key, save_key, date_key):
             update_state_val(date_key, "")
 
 # ==========================================
-# 3. GLOBAL HELPER FUNCTIONS & REPORT WRAPPER
+# 3. REPORT GENERATION WRAPPER
 # ==========================================
 def make_report_wrapper(title, content_html):
     today_str = date.today().strftime('%d.%m.%Y')
@@ -91,35 +90,50 @@ def make_report_wrapper(title, content_html):
     """
 
 # ==========================================
-# 4. SIDEBAR - FINANCIAL SETTINGS & CRITERIA
+# 4. SIDEBAR - DYNAMIC NAVIGATION & PRICES
 # ==========================================
-st.sidebar.header("💵 إعدادات فئات أسعار المتر المربع")
+st.sidebar.image("https://img.icons8.com/clouds/100/000000/building.png", width=80)
+st.sidebar.title("Havence Control")
+st.sidebar.markdown("---")
 
-st.sidebar.subheader("🏠 أعمال التشطيبات الداخلية (İç Tesisat)")
-pm_price_int = st.sidebar.number_input("سعر البيع للمالك - داخلي (₺/m²)", value=get_state_val("global_pm_price_int", 450.0), step=10.0)
+# تفعيل التنقل بين الصفحات بشكل منفصل
+app_page = st.sidebar.radio(
+    "📂 اختر الصفحة المطلوبة:",
+    [
+        "💰 الميزانية والمستخلصات الشاملة", 
+        "🏠 أعمال التشطيبات الداخلية", 
+        "🧱 أعمال الواجهات الخارجية", 
+        "💧 أعمال الحمامات والمطابخ",
+        "⏱️ سجل الموقع الزمني"
+    ]
+)
+
+st.sidebar.markdown("---")
+st.sidebar.header("⚙️ إعدادات الأسعار (₺/m²)")
+
+# أسعار الفئات (مربوطة بقاعدة البيانات)
+pm_price_int = st.sidebar.number_input("البيع للمالك - داخلي", value=get_state_val("global_pm_price_int", 450.0), step=10.0)
 update_state_val("global_pm_price_int", pm_price_int)
-tech_price_int = st.sidebar.number_input("تكلفة الفني - داخلي (₺/m²)", value=get_state_val("global_tech_price_int", 300.0), step=10.0)
+tech_price_int = st.sidebar.number_input("تكلفة الفني - داخلي", value=get_state_val("global_tech_price_int", 300.0), step=10.0)
 update_state_val("global_tech_price_int", tech_price_int)
 
-st.sidebar.subheader("🧱 أعمال الواجهات الخارجية (Dış Cephe)")
-pm_price_ext = st.sidebar.number_input("سعر البيع للمالك - خارجي (₺/m²)", value=get_state_val("global_pm_price_ext", 600.0), step=10.0)
+pm_price_ext = st.sidebar.number_input("البيع للمالك - خارجي", value=get_state_val("global_pm_price_ext", 600.0), step=10.0)
 update_state_val("global_pm_price_ext", pm_price_ext)
-tech_price_ext = st.sidebar.number_input("تكلفة الفني - خارجي (₺/m²)", value=get_state_val("global_tech_price_ext", 400.0), step=10.0)
+tech_price_ext = st.sidebar.number_input("تكلفة الفني - خارجي", value=get_state_val("global_tech_price_ext", 400.0), step=10.0)
 update_state_val("global_tech_price_ext", tech_price_ext)
 
-st.sidebar.subheader("💧 أعمال الحمامات والمطابخ (Islak Hacim)")
-pm_price_toilet = st.sidebar.number_input("سعر البيع للمالك - حمامات (₺/m²)", value=get_state_val("global_pm_price_toilet", 750.0), step=10.0)
+pm_price_toilet = st.sidebar.number_input("البيع للمالك - حمامات", value=get_state_val("global_pm_price_toilet", 750.0), step=10.0)
 update_state_val("global_pm_price_toilet", pm_price_toilet)
-tech_price_toilet = st.sidebar.number_input("تكلفة الفني - حمامات (₺/m²)", value=get_state_val("global_tech_price_toilet", 500.0), step=10.0)
+tech_price_toilet = st.sidebar.number_input("تكلفة الفني - حمامات", value=get_state_val("global_tech_price_toilet", 500.0), step=10.0)
 update_state_val("global_tech_price_toilet", tech_price_toilet)
 
-# الأوزان النسبية المستحقة هندسياً لكل نوع عمل
+# الأوزان النسبية الهندسية
 interior_weights = {"Ano": 0.15, "Alci": 0.40, "Saten": 0.25, "Boya": 0.20}
 exterior_weights = {"Siva": 0.30, "Mantolama": 0.40, "Astar": 0.10, "Boya": 0.20}
 toilet_weights = {"Tesisat": 0.25, "Izolasyon": 0.20, "Seramik": 0.45, "Montaj": 0.10}
 
 # ==========================================
-# 5. INTEGRATED PROJECT STRUCTURE
+# 5. FIXED DATA STRUCTURE (SURVEYING)
 # ==========================================
 project_structure = {
     "الدور -1 (البدروم السكني والخدمي)": {
@@ -168,18 +182,17 @@ project_structure = {
     "الواجهات الخارجية للمبنى": {
         "الواجهة الأمامية الرئيسية": {"area": 280.00, "type": "exterior"},
         "الواجهة الخلفية": {"area": 240.00, "type": "exterior"},
-        "الجانب الأيمن (Yan Cephe)": {"area": 20.00 * 10.00, "type": "exterior"},  # معتمد بارتفاع 20 متر صافي الحصر
+        "الجانب الأيمن (Yan Cephe)": {"area": 20.00 * 10.00, "type": "exterior"}, # الارتفاع المحدث 20 متر
         "الجانب الأيسر": {"area": 200.00, "type": "exterior"}
     }
 }
 
 # ==========================================
-# 6. MATHEMATICAL COMPILATION ENGINE
+# 6. CALCULATIONS MATRIX
 # ==========================================
 flat_sections = []
 total_project_area = 0
 total_completed_equivalent_area = 0
-
 total_billing_owner = 0
 total_labor_cost = 0
 
@@ -213,7 +226,7 @@ for floor_name, sections in project_structure.items():
                             (exterior_weights["Boya"] if p4 else 0))
             current_pm = pm_price_ext
             current_tech = tech_price_ext
-            phases = [("ext_siva", "المحارة الخارجية (Kaba Sıva)"), ("ext_mant", "العزل الحراري (Mantolama)"), ("ext_ast", "الآستار (Astar)"), ("ext_boy", "دهان الواجهة (Boyama)")]
+            phases = [("ext_siva", "المحارة الخارجية"), ("ext_mant", "العزل الحراري"), ("ext_ast", "الآستار"), ("ext_boy", "دهان الواجهة")]
             
         else: # toilet
             p1 = get_state_val(f"cb_toi_tes_{global_idx}", False)
@@ -223,219 +236,4 @@ for floor_name, sections in project_structure.items():
             sec_progress = ((toilet_weights["Tesisat"] if p1 else 0) + 
                             (toilet_weights["Izolasyon"] if p2 else 0) + 
                             (toilet_weights["Seramik"] if p3 else 0) + 
-                            (toilet_weights["Montaj"] if p4 else 0))
-            current_pm = pm_price_toilet
-            current_tech = tech_price_toilet
-            phases = [("toi_tes", "السباكة والتأسيس"), ("toi_izo", "العزل المائي"), ("toi_ser", "تركيب السيراميك والبورسلان"), ("toi_mon", "القطع الصحية والدوش")]
-
-        completed_area = area * sec_progress
-        total_project_area += area
-        total_completed_equivalent_area += completed_area
-        
-        total_billing_owner += completed_area * current_pm
-        total_labor_cost += completed_area * current_tech
-        
-        flat_sections.append({
-            "global_idx": global_idx,
-            "floor": floor_name,
-            "section": sec_name,
-            "area": area,
-            "type": sec_type,
-            "progress": sec_progress,
-            "comp_area": completed_area,
-            "pm_price": current_pm,
-            "tech_price": current_tech,
-            "phases": phases,
-            "p1": p1, "p2": p2, "p3": p3, "p4": p4
-        })
-        global_idx += 1
-
-net_company_profit = total_billing_owner - total_labor_cost
-overall_project_progress_pct = (total_completed_equivalent_area / total_project_area) if total_project_area > 0 else 0
-
-# تجميع خط الزمن لجميع الفئات
-timeline_events = []
-for item in flat_sections:
-    g_id = item["global_idx"]
-    for phase_code, phase_name in item["phases"]:
-        d = get_state_val(f"date_{phase_code}_{g_id}", "")
-        if d:
-            timeline_events.append({
-                "التاريخ": d,
-                "الموقع/الدور": item["floor"],
-                "القطاع / البند": item["section"],
-                "المرحلة المكتملة": phase_name
-            })
-
-# ==========================================
-# 7. UI NAVIGATION & INTERFACE TABS
-# ==========================================
-st.markdown(f"### 📊 النسبة الإجمالية المكتملة للمشروع بالكامل: `{overall_project_progress_pct*100:.2f}%`")
-
-tab_money, tab_floors, tab_timeline = st.tabs([
-    "💰 الحسابات والمستخلصات المالية الشاملة", 
-    "🏢 متابعة غرف وقطاعات وواجهات المشروع تفصيلياً", 
-    "⏱️ السجل الزمني الحي للموقع"
-])
-
-# --- TAB 1: FINANCIAL SUMMARY ---
-with tab_money:
-    st.header("💰 الخلاصة المالية وحسابات الأرباح الموحدة")
-    
-    c1, c2, c3 = st.columns(3)
-    c1.metric("إجمالي مستحق على المالك (الملك)", f"₺ {total_billing_owner:,.2f}")
-    c2.metric("إجمالي مستحق للفنيين (Labor Cost)", f"₺ {total_labor_cost:,.2f}")
-    c3.metric("صافي أرباح شركة Havence", f"₺ {net_company_profit:,.2f}", delta=f"{overall_project_progress_pct*100:.1f}% إنجاز")
-    
-    st.markdown("---")
-    
-    table_rows_html = ""
-    report_data_list = []
-    
-    for item in flat_sections:
-        sec_billing = item["comp_area"] * item["pm_price"]
-        sec_cost = item["comp_area"] * item["tech_price"]
-        sec_profit = sec_billing - sec_cost
-        
-        type_mapping = {"interior": "داخلي (İç)", "exterior": "خارجي (Dış)", "toilet": "حمامات (Islak)"}
-        
-        report_data_list.append({
-            "الدور / الموقع": item["floor"],
-            "القطاع / البند": item["section"],
-            "الفئة": type_mapping[item["type"]],
-            "المساحة (م2)": f"{item['area']:.2f}",
-            "نسبة الإنجاز": f"{item['progress']*100:.0f}%",
-            "مستخلص المالك": f"₺ {sec_billing:,.2f}",
-            "أجرة الفني": f"₺ {sec_cost:,.2f}"
-        })
-        
-        table_rows_html += f"""
-        <tr>
-            <td>{item['floor']}</td>
-            <td>{item['section']}</td>
-            <td>{type_mapping[item['type']]}</td>
-            <td>{item['area']:.2f} م²</td>
-            <td>{item['progress']*100:.0f}%</td>
-            <td>₺ {sec_billing:,.2f}</td>
-            <td>₺ {sec_cost:,.2f}</td>
-            <td>₺ {sec_profit:,.2f}</td>
-        </tr>
-        """
-        
-    money_html_content = f"""
-    <div class="grid">
-        <div class="card"><div class="card-lbl">إجمالي مستخلص المالك المعتمَد</div><div class="card-val">₺ {total_billing_owner:,.2f}</div></div>
-        <div class="card"><div class="card-lbl">إجمالي تكلفة أجرة الفنيين</div><div class="card-val">₺ {total_labor_cost:,.2f}</div></div>
-        <div class="card"><div class="card-lbl">صافي الأرباح الموحدة لشركة Havence</div><div class="card-val">₺ {net_company_profit:,.2f}</div></div>
-    </div>
-    <table>
-        <thead>
-            <tr>
-                <th>الدور / الموقع</th>
-                <th>القطاع / البند</th>
-                <th>الفئة</th>
-                <th>المساحة الصافية</th>
-                <th>نسبة الإنجاز</th>
-                <th>مستخلص المالك</th>
-                <th>أجرة الفني</th>
-                <th>صافي الأرباح</th>
-            </tr>
-        </thead>
-        <tbody>
-            {table_rows_html}
-            <tr class="total">
-                <td colspan="3">المجموع الإجمالي الموحد للمشروع</td>
-                <td>{total_project_area:,.2f} م²</td>
-                <td>{overall_project_progress_pct*100:.2f}%</td>
-                <td>₺ {total_billing_owner:,.2f}</td>
-                <td>₺ {total_labor_cost:,.2f}</td>
-                <td>₺ {net_company_profit:,.2f}</td>
-            </tr>
-        </tbody>
-    </table>
-    """
-    
-    st.download_button("📱 تحميل مستخلص شامل متوافق مع الجوال (PDF / HTML)", 
-                       make_report_wrapper("التقرير المالي والمستخلص الشامل للمشروع - شركة Havence", money_html_content), 
-                       file_name="Havence_Total_Project_Report.html", mime="text/html")
-    
-    st.dataframe(pd.DataFrame(report_data_list), use_container_width=True)
-
-# --- TAB 2: PROGRESS TRACKING & SECTIONS ---
-with tab_floors:
-    st.header("🏢 تفاصيل بنود وأقسام الموقع الميداني")
-    
-    for floor_name, sections in project_structure.items():
-        with st.expander(f"⬇️ {floor_name}", expanded=True):
-            col1, col2 = st.columns(2)
-            
-            floor_items = [x for x in flat_sections if x["floor"] == floor_name]
-            for idx, item in enumerate(floor_items):
-                g_id = item["global_idx"]
-                target_col = col1 if idx % 2 == 0 else col2
-                
-                with target_col:
-                    badge = "🏠 [داخلي]" if item["type"] == "interior" else "🧱 [خارجي]" if item["type"] == "exterior" else "💧 [حمامات]"
-                    st.write(f"##### {badge} {item['section']} ({item['area']:.2f} م²)")
-                    
-                    if item["type"] == "interior":
-                        st.checkbox("البؤج والأوتار (Ano) [15%]", value=item["p1"], key=f"p_int_ano_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_int_ano_{g_id}", f"cb_int_ano_{g_id}", f"date_int_ano_{g_id}"))
-                        st.checkbox("المحارة ماكينة وجه واحد (Alçı) [40%]", value=item["p2"], key=f"p_int_alc_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_int_alc_{g_id}", f"cb_int_alc_{g_id}", f"date_int_alc_{g_id}"))
-                        st.checkbox("المعجون الناعم والتحضير (Saten) [25%]", value=item["p3"], key=f"p_int_sat_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_int_sat_{g_id}", f"cb_int_sat_{g_id}", f"date_int_sat_{g_id}"))
-                        st.checkbox("الدهانات والوجه النهائي (Boya) [20%]", value=item["p4"], key=f"p_int_boy_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_int_boy_{g_id}", f"cb_int_boy_{g_id}", f"date_int_boy_{g_id}"))
-                    
-                    elif item["type"] == "exterior":
-                        st.checkbox("المحارة الخارجية (Sıva) [30%]", value=item["p1"], key=f"p_ext_siva_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_ext_siva_{g_id}", f"cb_ext_siva_{g_id}", f"date_ext_siva_{g_id}"))
-                        st.checkbox("العزل الحراري والتلبيس (Mantolama) [40%]", value=item["p2"], key=f"p_ext_mant_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_ext_mant_{g_id}", f"cb_ext_mant_{g_id}", f"date_ext_mant_{g_id}"))
-                        st.checkbox("الوجه التحضيري (Astar) [10%]", value=item["p3"], key=f"p_ext_ast_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_ext_ast_{g_id}", f"cb_ext_ast_{g_id}", f"date_ext_ast_{g_id}"))
-                        st.checkbox("الدهان الخارجي النهائي (Boya) [20%]", value=item["p4"], key=f"p_ext_boy_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_ext_boy_{g_id}", f"cb_ext_boy_{g_id}", f"date_ext_boy_{g_id}"))
-                    
-                    else: # toilet
-                        st.checkbox("تأسيس السباكة والتغذية (Tesisat) [25%]", value=item["p1"], key=f"p_toi_tes_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_toi_tes_{g_id}", f"cb_toi_tes_{g_id}", f"date_toi_tes_{g_id}"))
-                        st.checkbox("العزل المائي الكيميائي (İzolasyon) [20%]", value=item["p2"], key=f"p_toi_izo_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_toi_izo_{g_id}", f"cb_toi_izo_{g_id}", f"date_toi_izo_{g_id}"))
-                        st.checkbox("تركيب السيراميك والبورسلان (Seramik) [45%]", value=item["p3"], key=f"p_toi_ser_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_toi_ser_{g_id}", f"cb_toi_ser_{g_id}", f"date_toi_ser_{g_id}"))
-                        st.checkbox("تشطيب وتركيب القطع الصحية (Montaj) [10%]", value=item["p4"], key=f"p_toi_mon_{g_id}", 
-                                    on_change=handle_checkbox_change, args=(f"p_toi_mon_{g_id}", f"cb_toi_mon_{g_id}", f"date_toi_mon_{g_id}"))
-                    
-                    st.write(f"نسبة إنجاز البند: `{item['progress']*100:.0f}%` | الأمتار المكافئة: `{item['comp_area']:.2f} م²`")
-                    st.markdown("---")
-
-# --- TAB 3: LIVE TIMELINE LOG ---
-with tab_timeline:
-    st.header("⏱️ سجل تنفيذ مراحل العمل الموحد")
-    
-    if timeline_events:
-        df_time = pd.DataFrame(timeline_events)
-        df_time['dt_parse'] = pd.to_datetime(df_time['التاريخ'], format='%d.%m.%Y')
-        df_time = df_time.sort_values(by='dt_parse', ascending=False).drop(columns=['dt_parse'])
-        
-        st.dataframe(df_time, use_container_width=True)
-        
-        t_rows_html = ""
-        for _, r in df_time.iterrows():
-            t_rows_html += f"<tr><td>{r['التاريخ']}</td><td>{r['الموقع/الدور']}</td><td>{r['القطاع / البند']}</td><td>{r['المرحلة المكتملة']}</td></tr>"
-            
-        time_html = f"""
-        <table>
-            <thead>
-                <tr><th>التاريخ</th><th>الموقع/الدور</th><th>القطاع / البند</th><th>المرحلة المكتملة</th></tr>
-            </thead>
-            <tbody>{t_rows_html}</tbody>
-        </table>
-        """
-        st.download_button("📱 تحميل سجل التنفيذ الزمني الموحد كـ PDF", 
-                           make_report_wrapper("سجل التنفيذ والجدول الزمني الفعلي الشامل للموقع - Havence", time_html), 
-                           file_name="Havence_Master_Timeline_Report.html", mime="text/html")
-    else:
-        st.info("لم يتم تسجيل أو إنجاز أي خطوة تنفيذية في الموقع حتى الآن.")
+                            (toilet_
