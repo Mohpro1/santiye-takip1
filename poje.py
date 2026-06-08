@@ -14,19 +14,12 @@ st.set_page_config(page_title="Havence - Şantiye & Kârlılık Takip Sistemi", 
 SUPABASE_URL = "https://lhndsijncxofuvhwkarc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxobmRzaWpuY3hvZnV2aHdrYXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4OTI3ODgsImV4cCI6MjA5NjQ2ODc4OH0.RYoa2eW56J-F116D-nJcMEdX0WwgJQu5hH9ELJ-hqJs"
 
-supabase = None 
-
-@st.cache_resource
-def init_supabase():
-    try:
-        return create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        return None
-
+# Canlı bağlantı kurulumu (Cache kaldırıldı - Doğrudan tetikleniyor)
 try:
-    supabase = init_supabase()
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
-    st.error(f"Supabase Bağlantı Hatası: {e}")
+    supabase = None
+    st.error(f"Supabase Başlatma Hatası: {e}")
 
 ROW_ID = "havence_project_state" 
 
@@ -38,18 +31,20 @@ def load_data_from_supabase():
         if response.data and len(response.data) > 0:
             return response.data[0]["val"]
     except Exception as e:
-        st.warning(f"Veri yüklenirken hata oluştu (Supabase): {e}")
+        # Hata detayını yan menüde göster ama uygulamanın çalışmasını engelleme
+        st.sidebar.warning(f"🔄 Veritabanı senkronizasyon kontrolü: {e}")
     return {}
 
 def save_data_to_supabase(data):
     if supabase is None:
-        st.warning("⚠️ Supabase bağlantısı olmadığı için değişiklikler buluta kaydedilemedi!")
+        st.error("⚠️ Veritabanı bağlantısı kurulamadığı için değişiklikler kaydedilemedi!")
         return
     try:
         supabase.table("total_progress_data").upsert({"id": ROW_ID, "val": data}).execute()
     except Exception as e:
         st.error(f"Veri kaydedilirken hata oluştu (Supabase): {e}")
 
+# İlk açılışta verileri çek
 if "saved_state" not in st.session_state:
     st.session_state.saved_state = load_data_from_supabase()
 
@@ -123,8 +118,8 @@ app_page = st.sidebar.radio(
     [
         "🏁 Proje Durumu & İş Programı",
         "💰 İşveren Hakediş Raporu", 
-        "👷 Usta Hak Edişleri",             # TEP T1: Sadece Usta hakedişleri
-        "📊 Havence Kârlılık Analizi",       # TEP T2: Sadece Kar ve Finansal Analiz
+        "👷 Usta Hak Edişleri",             
+        "📊 Havence Kârlılık Analizi",       
         "🏠 İç Mekan İşleri (Alçı & Boya)", 
         "🧱 Dış Cephe İşleri", 
         "💧 Tuvalet & Islak Hacim (Kara Sıva)",
@@ -457,7 +452,7 @@ elif app_page == "💰 İşveren Hakediş Raporu":
     st.markdown("---")
     st.dataframe(pd.DataFrame(report_list), use_container_width=True)
 
-# --- MODÜL 3: SADECE USTA HAK EDİŞLERİ (YENİ - SEPARATED) ---
+# --- MODÜL 3: SADECE USTA HAK EDİŞLERİ ---
 elif app_page == "👷 Usta Hak Edişleri":
     st.header("👷 Sub-Contractor Labor Hak Ediş Tracking")
     
@@ -494,7 +489,7 @@ elif app_page == "👷 Usta Hak Edişleri":
         
     st.dataframe(pd.DataFrame(labor_report), use_container_width=True)
 
-# --- MODÜL 4: SADECE HAVENCE KARLILIK ANALİZİ (YENİ - SEPARATED) ---
+# --- MODÜL 4: SADECE HAVENCE KARLILIK ANALİZİ (AYRI SAYFA) ---
 elif app_page == "📊 Havence Kârlılık Analizi":
     st.header("📊 Havence Şantiye Finansal Kârlılık Analiz Paneli")
     
