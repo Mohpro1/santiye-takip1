@@ -49,7 +49,7 @@ def save_data_to_supabase(data):
             put_url = f"{API_URL}?id=eq.{ROW_ID}"
             put_headers = headers.copy()
             put_headers["Prefer"] = "return=representation"
-            response_put = requests.put(put_url, headers=put_headers, json=payload, timeout=10)
+            requests.put(put_url, headers=put_headers, json=payload, timeout=10)
     except Exception as e:
         st.error(f"Veri kaydedilirken hata oluştu (API): {e}")
 
@@ -86,7 +86,7 @@ def highlight_completed(row):
     return [''] * len(row)
 
 # ==========================================
-# 4. RAPOR ÇIKTI ŞABLONU
+# 4. RAPOR ÇIKTI ŞABLONU (PDF UYUMLU HTML)
 # ==========================================
 def make_report_wrapper(title, content_html):
     today_str = date.today().strftime('%d.%m.%Y')
@@ -236,13 +236,19 @@ project_structure = {
 }
 
 # ==========================================
-# 7. HESAPLAMA MOTORU
+# 7. HESAPLAMA MOTORU (Maksimum Kapasite ve Mevcut)
 # ==========================================
 flat_sections = []
 total_project_area = 0
 total_completed_equivalent_area = 0
-total_billing_owner = 0
-total_labor_cost = 0
+
+# Mevcut İlerleyen Durum Finansalları
+total_billing_owner_current = 0
+total_labor_cost_current = 0
+
+# %100 Bittiğinde Olacak Toplam Değerler (Total Project Value)
+total_project_owner_value = 0
+total_project_labor_value = 0
 
 groups_data = {
     "interior": {"total_area": 0.0, "comp_area": 0.0},
@@ -317,8 +323,13 @@ for floor_name, sections in project_structure.items():
         total_project_area += area
         total_completed_equivalent_area += completed_area
         
-        total_billing_owner += completed_area * current_pm
-        total_labor_cost += completed_area * current_tech
+        # Mevcut Hakediş Tutarları
+        total_billing_owner_current += completed_area * current_pm
+        total_labor_cost_current += completed_area * current_tech
+        
+        # %100 Bitince Gelecek Maksimum Sözleşme Değerleri
+        total_project_owner_value += area * current_pm
+        total_project_labor_value += area * current_tech
         
         groups_data[group_key]["total_area"] += area
         groups_data[group_key]["comp_area"] += completed_area
@@ -364,7 +375,6 @@ if app_page == "🏁 Proje Durumu & İş Programı":
         st.progress(toi_pct / 100)
 
     st.markdown("---")
-    
     st.subheader("🗓️ Zaman Planı ve Takvimi")
     col_t1, col_t2 = st.columns(2)
     with col_t1:
@@ -390,11 +400,10 @@ if app_page == "🏁 Proje Durumu & İş Programı":
     else:
         c_m3.error("🔴 Zaman Planının Gerisinde")
 
-# --- MODÜL 2: İŞVEREN HAKEDİŞ RAPORU (DÖNEMSEL PARÇALI ÖDEMELER) ---
+# --- MODÜL 2: İŞVEREN HAKEDİŞ RAPORU (TOTAL PROJECT VALUE + PDF ADDED) ---
 elif app_page == "💰 İşveren Hakediş Raporu":
     st.header("💰 İşveren Dönemsel Hakediş Alacak Raporu")
     
-    # Çoklu hakediş tahsilat geçmişi (List of dicts)
     owner_payments_history = get_state_val("owner_payments_history_list", [])
     
     st.subheader("📥 İşverenden Alınan Parçalı Ödeme Girişi")
@@ -407,18 +416,13 @@ elif app_page == "💰 İşveren Hakediş Raporu":
         st.write("<br>", unsafe_allow_html=True)
         if st.button("📥 Yeni Ödeme Ekle", use_container_width=True):
             if new_op_amount > 0:
-                owner_payments_history.append({
-                    "Tarih": new_op_date.strftime("%d.%m.%Y"),
-                    "Miktar": new_op_amount
-                })
+                owner_payments_history.append({"Tarih": new_op_date.strftime("%d.%m.%Y"), "Miktar": new_op_amount})
                 update_state_val("owner_payments_history_list", owner_payments_history)
                 st.rerun()
 
-    # Toplam Alınan Ödemeyi Hesaplama
     total_owner_received = sum([p["Miktar"] for p in owner_payments_history])
-    owner_rest = total_billing_owner - total_owner_received
+    owner_rest = total_billing_owner_current - total_owner_received
     
-    # Ödeme Geçmişi Tablosu Gösterimi
     if owner_payments_history:
         with st.expander("🔍 İşveren Alınan Ödemeler Detay Listesi", expanded=False):
             df_op_hist = pd.DataFrame(owner_payments_history)
@@ -429,16 +433,15 @@ elif app_page == "💰 İşveren Hakediş Raporu":
                 
     st.markdown("---")
     
-    col_rep1, col_rep2, col_rep3 = st.columns(3)
-    with col_rep1:
-        st.metric("Hak Edilen Toplam Tutar", f"₺ {total_billing_owner:,.2f}")
-    with col_rep2:
-        st.metric("İşverenin Ödediği Toplam", f"₺ {total_owner_received:,.2f}")
-    with col_rep3:
-        if owner_rest >= 0:
-            st.metric("İşverenden Kalan Alacak", f"₺ {owner_rest:,.2f}", delta="- Kalan Alacak", delta_color="inverse")
-        else:
-            st.metric("İşverenden Fazla Alınan (Avans)", f"₺ {abs(owner_rest):,.2f}", delta="+ Avans", delta_color="normal")
+    # METRIKLER
+    m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+    m_col1.metric("Proje Toplam Sözleşme Bedeli", f"₺ {total_project_owner_value:,.2f}")
+    m_col2.metric("Şu Ana Kadar Hak Edilen", f"₺ {total_billing_owner_current:,.2f}")
+    m_col3.metric("İşverenin Ödediği Toplam", f"₺ {total_owner_received:,.2f}")
+    if owner_rest >= 0:
+        m_col4.metric("İşverenden Kalan Alacak", f"₺ {owner_rest:,.2f}", delta="- Kalan Alacak", delta_color="inverse")
+    else:
+        m_col4.metric("İşverenden Fazla Alınan (Avans)", f"₺ {abs(owner_rest):,.2f}", delta="+ Avans", delta_color="normal")
             
     report_list = []
     type_map = {
@@ -459,27 +462,17 @@ elif app_page == "💰 İşveren Hakediş Raporu":
         prog_pct_int = int(item["progress"] * 100)
         
         report_list.append({
-            "Kat / Yapı Bölgesi": item["floor"], 
-            "Bölüm / Mahal": item["section"], 
-            "İmalat Kategorisi": category_name,
-            "Toplam Metraj": f"{item['area']:.2f} m²", 
-            "Tamamlanma Oranı": f"% {prog_pct_int}",
-            "Sözleşme Birim Fiyatı": f"₺ {item['pm_price']:.2f}", 
-            "Hakediş Tutarı": f"₺ {sec_bill:,.2f}",
-            "Son Onay Tarihi": last_date
+            "Kat / Yapı Bölgesi": item["floor"], "Bölüm / Mahal": item["section"], "İmalat Kategorisi": category_name,
+            "Toplam Metraj": f"{item['area']:.2f} m²", "Tamamlanma Oranı": f"% {prog_pct_int}",
+            "Birim Fiyat": f"₺ {item['pm_price']:.2f}", "Hakediş Tutarı": f"₺ {sec_bill:,.2f}", "Son Onay Tarihi": last_date
         })
         
         row_class = ' class="completed-row"' if prog_pct_int == 100 else ''
         html_rows += f"""
         <tr{row_class}>
-            <td>{item['floor']}</td>
-            <td>{item['section']}</td>
-            <td>{category_name}</td>
-            <td>{item['area']:.2f} m²</td>
-            <td>% {prog_pct_int}</td>
-            <td>₺ {item['pm_price']:.2f}</td>
-            <td>₺ {sec_bill:,.2f}</td>
-            <td>{last_date}</td>
+            <td>{item['floor']}</td><td>{item['section']}</td><td>{category_name}</td>
+            <td>{item['area']:.2f} m²</td><td>% {prog_pct_int}</td><td>₺ {item['pm_price']:.2f}</td>
+            <td>₺ {sec_bill:,.2f}</td><td>{last_date}</td>
         </tr>
         """
         
@@ -487,21 +480,19 @@ elif app_page == "💰 İşveren Hakediş Raporu":
     <table>
         <thead>
             <tr>
-                <th>Kat / Bölge</th>
-                <th>Bölüm / Mahal</th>
-                <th>Kategori</th>
-                <th>Toplam Metraj</th>
-                <th>İlerleme</th>
-                <th>Birim Fiyat</th>
-                <th>Hakediş Tutarı</th>
-                <th>Son Onay Tarihi</th>
+                <th>Kat / Bölge</th><th>Bölüm / Mahal</th><th>Kategori</th><th>Toplam Metraj</th>
+                <th>İlerleme</th><th>Birim Fiyat</th><th>Hakediş Tutarı</th><th>Son Onay Tarihi</th>
             </tr>
         </thead>
         <tbody>
             {html_rows}
+            <tr class="total" style="background-color: #e3f2fd !important;">
+                <td colspan="6" style="text-align: right;">PROJE TOPLAM SÖZLEŞME BEDELİ (%100 KAPASİTE):</td>
+                <td colspan="2">₺ {total_project_owner_value:,.2f}</td>
+            </tr>
             <tr class="total">
-                <td colspan="6" style="text-align: right;">TOPLAM HAK EDİLEN ALACAK:</td>
-                <td colspan="2">₺ {total_billing_owner:,.2f}</td>
+                <td colspan="6" style="text-align: right;">MEVCUT HAK EDİLEN TOPLAM TUTAR:</td>
+                <td colspan="2">₺ {total_billing_owner_current:,.2f}</td>
             </tr>
             <tr class="total" style="background-color: #fff3cd !important;">
                 <td colspan="6" style="text-align: right;">İŞVERENDEN ALINAN TOPLAM ÖDEME:</td>
@@ -516,10 +507,9 @@ elif app_page == "💰 İşveren Hakediş Raporu":
     """
     
     final_report_code = make_report_wrapper("Havence - Resmi İşveren Hakediş Raporu", full_html_report)
-    
     st.markdown("<br>", unsafe_allow_html=True)
     st.download_button(
-        label="📄 Raporu PDF / HTML Olarak İndir",
+        label="📄 Raporu PDF / HTML Olarak İndir (İşveren İçin)",
         data=final_report_code,
         file_name=f"Havence_Isveren_Hakedis_{date.today().strftime('%d_%m_%Y')}.html",
         mime="text/html"
@@ -529,11 +519,10 @@ elif app_page == "💰 İşveren Hakediş Raporu":
     df_styled = pd.DataFrame(report_list)
     st.dataframe(df_styled.style.apply(highlight_completed, axis=1), use_container_width=True)
 
-# --- MODÜL 3: USTA HAK EDİŞLERİ (PARÇALI ÖDEMELER & HAKEDİŞ GEÇMİŞİ) ---
+# --- MODÜL 3: USTA HAK EDİŞLERİ (TOTAL LABOR VALUE + PDF ADDED) ---
 elif app_page == "👷 Usta Hak Edişleri":
     st.header("👷 Sub-Contractor Labor Hak Ediş Tracking")
     
-    # Çoklu Usta Ödeme Geçmişi listesi
     labor_payments_history = get_state_val("labor_payments_history_list", [])
     
     st.subheader("📤 Ustalara Yapılan Parçalı Ödeme Girişi")
@@ -546,18 +535,13 @@ elif app_page == "👷 Usta Hak Edişleri":
         st.write("<br>", unsafe_allow_html=True)
         if st.button("📤 Ödeme Kaydet", use_container_width=True):
             if new_lp_amount > 0:
-                labor_payments_history.append({
-                    "Tarih": new_lp_date.strftime("%d.%m.%Y"),
-                    "Miktar": new_lp_amount
-                })
+                labor_payments_history.append({"Tarih": new_lp_date.strftime("%d.%m.%Y"), "Miktar": new_lp_amount})
                 update_state_val("labor_payments_history_list", labor_payments_history)
                 st.rerun()
 
-    # Toplam Ödenen Usta Ücreti Hesaplama
     total_labor_paid = sum([p["Miktar"] for p in labor_payments_history])
-    labor_rest = total_labor_cost - total_labor_paid
+    labor_rest = total_labor_cost_current - total_labor_paid
     
-    # Usta Ödeme Geçmişi Listesi Gösterimi
     if labor_payments_history:
         with st.expander("🔍 Ustalara Yapılan Ödemeler Geçmiş Listesi", expanded=False):
             df_lp_hist = pd.DataFrame(labor_payments_history)
@@ -567,20 +551,15 @@ elif app_page == "👷 Usta Hak Edişleri":
                 st.rerun()
 
     st.markdown("---")
-    col_l1, col_l2, col_l3 = st.columns(3)
-    with col_l1:
-        st.metric("Ustalara Hak Edilen Toplam Maliyet", f"₺ {total_labor_cost:,.2f}")
-    with col_l2:
-        st.metric("Ustalara Ödenen Toplam Miktar", f"₺ {total_labor_paid:,.2f}")
-    with col_l3:
-        if labor_rest >= 0:
-            st.metric("Ustalara Kalan Borcumuz", f"₺ {labor_rest:,.2f}", delta="- Kalan Borç", delta_color="inverse")
-        else:
-            st.metric("Ustalara Fazla Ödenen (Avans)", f"₺ {abs(labor_rest):,.2f}", delta="+ Fazla Ödenen", delta_color="normal")
+    l_col1, l_col2, l_col3, l_col4 = st.columns(4)
+    l_col1.metric("Toplam Usta Bütçesi (%100 Bitince)", f"₺ {total_project_labor_value:,.2f}")
+    l_col2.metric("Ustalara Hak Edilen (Şu An)", f"₺ {total_labor_cost_current:,.2f}")
+    l_col3.metric("Ustalara Ödenen Toplam", f"₺ {total_labor_paid:,.2f}")
+    if labor_rest >= 0:
+        l_col4.metric("Ustalara Kalan Borcumuz", f"₺ {labor_rest:,.2f}", delta="- Kalan Borç", delta_color="inverse")
+    else:
+        l_col4.metric("Ustalara Fazla Ödenen (Avans)", f"₺ {abs(labor_rest):,.2f}", delta="+ Fazla Ödenen", delta_color="normal")
             
-    st.markdown("---")
-    st.subheader("📋 Bölüm Bazlı Usta Hak Edişleri ve İş Bitim Kayıtları")
-    
     labor_report = []
     type_map = {
         "interior": "İç Mekan İmalatları", "exterior_front": "Ön Cephe Sistemi", 
@@ -588,6 +567,7 @@ elif app_page == "👷 Usta Hak Edişleri":
         "exterior_wall_interior": "Çevre Duvarı (İç Yüzey)", "toilet": "Tuvalet Kara Sıva"
     }
     
+    html_rows_labor = ""
     for item in flat_sections:
         sec_cost = item["comp_area"] * item["tech_price"]
         prog_pct_int = int(item["progress"] * 100)
@@ -596,39 +576,97 @@ elif app_page == "👷 Usta Hak Edişleri":
         for phase_code, phase_name, checked in item["phases"]:
             d = get_state_val(f"date_{phase_code}_{item['global_idx']}", "")
             if d: done_dates.append(f"{phase_name}: {d}")
-            
         dates_str = " / ".join(done_dates) if done_dates else "Kayıt Yok"
         
+        category_name = type_map.get(item["type"], "Dış Cephe")
         labor_report.append({
-            "Konum / Kat": item["floor"],
-            "Bölüm / Mahal": item["section"],
-            "İş Sınıف / Kategori": type_map.get(item["type"], "Dış Cephe"),
-            "İlerleme Oranı": f"% {prog_pct_int}",
-            "Eşdeğer Biten Alan": f"{item['comp_area']:.2f} m²",
-            "Usta Birim Maliyeti": f"₺ {item['tech_price']:.2f}",
-            "Usta Alacağı Tutar": f"₺ {sec_cost:,.2f}",
-            "Onay Tarihleri": dates_str
+            "Konum / Kat": item["floor"], "Bölüm / Mahal": item["section"], "İş Sınıfı / Kategori": category_name,
+            "İlerleme Oranı": f"% {prog_pct_int}", "Eşdeğer Biten Alan": f"{item['comp_area']:.2f} m²",
+            "Usta Birim Maliyeti": f"₺ {item['tech_price']:.2f}", "Usta Alacağı Tutar": f"₺ {sec_cost:,.2f}", "Onay Tarihleri": dates_str
         })
         
+        row_class = ' class="completed-row"' if prog_pct_int == 100 else ''
+        html_rows_labor += f"""
+        <tr{row_class}>
+            <td>{item['floor']}</td><td>{item['section']}</td><td>{category_name}</td>
+            <td>% {prog_pct_int}</td><td>{item['comp_area']:.2f} m²</td><td>₺ {item['tech_price']:.2f}</td>
+            <td>₺ {sec_cost:,.2f}</td><td>{dates_str}</td>
+        </tr>
+        """
+
+    full_html_labor = f"""
+    <table>
+        <thead>
+            <tr>
+                <th>Kat / Bölge</th><th>Bölüm / Mahal</th><th>Kategori</th><th>İlerleme</th>
+                <th>Eşdeğer Alan</th><th>Birim Maliyet</th><th>Usta Alacağı</th><th>Aşama Detayları</th>
+            </tr>
+        </thead>
+        <tbody>
+            {html_rows_labor}
+            <tr class="total" style="background-color: #e3f2fd !important;">
+                <td colspan="6" style="text-align: right;">TOPLAM USTA MALİYET BÜTÇESİ (%100 BİTTİĞİNDE):</td>
+                <td colspan="2">₺ {total_project_labor_value:,.2f}</td>
+            </tr>
+            <tr class="total">
+                <td colspan="6" style="text-align: right;">ŞU ANA KADAR HAK EDİLEN USTA TOPLAM ALACAĞI:</td>
+                <td colspan="2">₺ {total_labor_cost_current:,.2f}</td>
+            </tr>
+            <tr class="total" style="background-color: #fff3cd !important;">
+                <td colspan="6" style="text-align: right;">USTALARA ÖDENEN TOPLAM MİKTAR:</td>
+                <td colspan="2">₺ {total_labor_paid:,.2f}</td>
+            </tr>
+            <tr class="total" style="background-color: #f8d7da !important;">
+                <td colspan="6" style="text-align: right;">USTALARA KALAN BORÇ DURUMU:</td>
+                <td colspan="2">₺ {labor_rest:,.2f}</td>
+            </tr>
+        </tbody>
+    </table>
+    """
+    
+    final_labor_report_code = make_report_wrapper("Havence - Resmi Sub-Contractor / Usta Hakediş Raporu", full_html_labor)
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.download_button(
+        label="📄 Raporu PDF / HTML Olarak İndir (Ustalar İçin)",
+        data=final_labor_report_code,
+        file_name=f"Havence_Usta_Hakedis_Raporu_{date.today().strftime('%d_%m_%Y')}.html",
+        mime="text/html"
+    )
+
+    st.markdown("---")
     df_labor_styled = pd.DataFrame(labor_report)
     st.dataframe(df_labor_styled.style.apply(highlight_completed, axis=1), use_container_width=True)
 
-# --- MODÜL 4: HAVENCE KARLILIK ANALİZİ ---
+# --- MODÜL 4: HAVENCE KARLILIK ANALİZİ (MY PAGE - TOTAL COST + TOTAL SUBCONTRACTOR + TOTAL PROFIT + PDF ADDED) ---
 elif app_page == "📊 Havence Kârlılık Analizi":
-    st.header("📊 Havence Şantiye Finansal Kârlılık Analiz Paneli")
+    st.header("📊 Havence Şantiye Finansal Kârlılık ve Hak Ediş Analiz Paneli")
     
-    net_profit = total_billing_owner - total_labor_cost
+    # Kârlılık Hesaplamaları (Mevcut Durum)
+    net_profit_current = total_billing_owner_current - total_labor_cost_current
+    margin_current = ((net_profit_current / total_billing_owner_current) * 100 if total_billing_owner_current > 0 else 0)
     
-    c_l1, c_l2, c_l3 = st.columns(3)
-    with c_l1:
-        st.metric("İşveren Toplam Hakediş (Gelir)", f"₺ {total_billing_owner:,.2f}")
-    with c_l2:
-        st.metric("Toplam Usta Maliyetleri (Gider)", f"₺ {total_labor_cost:,.2f}")
-    with c_l3:
-        st.metric("Havence Net Kâr Tutarı", f"₺ {net_profit:,.2f}", delta=f"% {((net_profit / total_billing_owner)*100 if total_billing_owner > 0 else 0):.1f} Kâr Marjı")
+    # Kârlılık Hesaplamaları (%100 Bittiğindeki Toplam Beklenti)
+    total_expected_profit = total_project_owner_value - total_project_labor_value
+    expected_margin = ((total_expected_profit / total_project_owner_value) * 100 if total_project_owner_value > 0 else 0)
+
+    # ÜST ANALİZ PANELİ (METRİKLER)
+    st.subheader("🎯 Proje Geneli Finansal Dağılım Özetleri")
+    
+    p_col1, p_col2 = st.columns(2)
+    with p_col1:
+        st.markdown("#### ⏳ Şimdiki Durum (Mevcut İlerlemeye Göre)")
+        st.metric("İşveren Mevcut Hakediş (Gelir)", f"₺ {total_billing_owner_current:,.2f}")
+        st.metric("Usta Mevcut Maliyeti (Gider)", f"₺ {total_labor_cost_current:,.2f}")
+        st.metric("Havence Şimdiki Net Kâr", f"₺ {net_profit_current:,.2f}", delta=f"% {margin_current:.1f} Mevcut Marj")
+        
+    with p_col2:
+        st.markdown("#### 🏁 Tam Kapasite Durumu (%100 Tamamlandığında)")
+        st.metric("Proje Toplam Satış Bedeli (Sözleşme)", f"₺ {total_project_owner_value:,.2f}")
+        st.metric("Proje Toplam Usta Maliyeti (Bütçe)", f"₺ {total_project_labor_value:,.2f}")
+        st.metric("Proje Toplam Beklenen Net Kâr", f"₺ {total_expected_profit:,.2f}", delta=f"% {expected_margin:.1f} Hedef Marj", delta_color="normal")
 
     st.markdown("---")
-    st.subheader("📈 Proje İçi Bölüm Bazlı Net Kazanç Dağılımı")
+    st.subheader("📈 Proje İçi Bölüm Bazlı Net Kazanç ve Detaylı Analiz")
     
     profit_report = []
     type_map = {
@@ -637,23 +675,74 @@ elif app_page == "📊 Havence Kârlılık Analizi":
         "exterior_wall_interior": "Çevre Duvarı (İç Yüzey)", "toilet": "Tuvalet Kara Sıva"
     }
     
+    html_rows_profit = ""
     for item in flat_sections:
-        sec_cost = item["comp_area"] * item["tech_price"]
-        sec_bill = item["comp_area"] * item["pm_price"]
-        sec_profit = sec_bill - sec_cost
+        sec_cost_current = item["comp_area"] * item["tech_price"]
+        sec_bill_current = item["comp_area"] * item["pm_price"]
+        sec_profit_current = sec_bill_current - sec_cost_current
+        
+        sec_bill_max = item["area"] * item["pm_price"]
+        sec_cost_max = item["area"] * item["tech_price"]
+        sec_profit_max = sec_bill_max - sec_cost_max
+        
         prog_pct_int = int(item["progress"] * 100)
+        category_name = type_map.get(item["type"], "Dış Cephe")
         
         profit_report.append({
-            "Konum / Kat": item["floor"],
-            "Bölüm / Mahal": item["section"],
-            "Kategori": type_map.get(item["type"], "Dış Cephe"),
-            "Tamamlanma Oranı": f"% {prog_pct_int}",
-            "Eşdeğer Biten Alan": f"{item['comp_area']:.2f} m²",
-            "İşveren Satış Tutarı": f"₺ {sec_bill:,.2f}",
-            "Usta Maliyet Tutarı": f"₺ {sec_cost:,.2f}",
-            "Havence Net Kâr": f"₺ {sec_profit:,.2f}"
+            "Konum / Kat": item["floor"], "Bölüm / Mahal": item["section"], "Kategori": category_name,
+            "İlerleme": f"% {prog_pct_int}", "İşveren Satış (Mevcut)": f"₺ {sec_bill_current:,.2f}",
+            "Usta Maliyet (Mevcut)": f"₺ {sec_cost_current:,.2f}", "Havence Net Kâr (Mevcut)": f"₺ {sec_profit_current:,.2f}",
+            "Toplam Proje Kârı (%100)": f"₺ {sec_profit_max:,.2f}"
         })
         
+        row_class = ' class="completed-row"' if prog_pct_int == 100 else ''
+        html_rows_profit += f"""
+        <tr{row_class}>
+            <td>{item['floor']}</td><td>{item['section']}</td><td>{category_name}</td><td>% {prog_pct_int}</td>
+            <td>₺ {sec_bill_current:,.2f}</td><td>₺ {sec_cost_current:,.2f}</td>
+            <td style="color:#155724; font-weight:bold;">₺ {sec_profit_current:,.2f}</td>
+            <td style="background-color:#e8f5e9;">₺ {sec_profit_max:,.2f}</td>
+        </tr>
+        """
+
+    full_html_profit = f"""
+    <table>
+        <thead>
+            <tr>
+                <th>Kat / Bölge</th><th>Bölüm / Mahal</th><th>Kategori</th><th>İlerleme</th>
+                <th>İşveren Satış (Mevcut)</th><th>Usta Maliyeti (Mevcut)</th><th>Havence Net Kâr (Mevcut)</th><th>Toplam Proje Kâr Hedefi (%100)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {html_rows_profit}
+            <tr class="total" style="background-color: #e3f2fd !important;">
+                <td colspan="4" style="text-align: right;">PROJE TOPLAM DEĞERLERİ (%100 BİTTİĞİNDE):</td>
+                <td>₺ {total_project_owner_value:,.2f}</td>
+                <td>₺ {total_project_labor_value:,.2f}</td>
+                <td>-</td>
+                <td style="background-color:#c8e6c9; font-size:16px;">₺ {total_expected_profit:,.2f}</td>
+            </tr>
+            <tr class="total" style="background-color: #e8f5e9 !important;">
+                <td colspan="4" style="text-align: right;">MEVCUT DURUM TOPLAMLARI (ŞU ANKİ İLERLEME):</td>
+                <td>₺ {total_billing_owner_current:,.2f}</td>
+                <td>₺ {total_labor_cost_current:,.2f}</td>
+                <td style="color:#1E4620; font-size:16px;">₺ {net_profit_current:,.2f}</td>
+                <td>-</td>
+            </tr>
+        </tbody>
+    </table>
+    """
+    
+    final_profit_report_code = make_report_wrapper("Havence - Şantiye İç Kârlılık, Maliyet ve Hakediş Master Raporu", full_html_profit)
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.download_button(
+        label="🖨️ Kârlılık ve Maliyet Raporunu PDF / HTML Olarak Yazdır",
+        data=final_profit_report_code,
+        file_name=f"Havence_Master_Karlilik_Analizi_{date.today().strftime('%d_%m_%Y')}.html",
+        mime="text/html"
+    )
+
+    st.markdown("---")
     df_profit_styled = pd.DataFrame(profit_report)
     st.dataframe(df_profit_styled.style.apply(highlight_completed, axis=1), use_container_width=True)
 
