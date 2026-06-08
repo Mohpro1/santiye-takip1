@@ -10,7 +10,7 @@ import json
 st.set_page_config(page_title="Havence - Şantiye & Kârlılık Takip Sistemi", layout="wide", page_icon="🏗️")
 
 # ==========================================
-# 2. SUPABASE REST API BAĞLANTI AYARLARI (409 HATASI ÇÖZÜLDÜ)
+# 2. SUPABASE REST API BAĞLANTI AYARLARI
 # ==========================================
 SUPABASE_URL = "https://lhndsijncxofuvhwkarc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxobmRzaWpuY3hvZnV2aHdrYXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4OTI3ODgsImV4cCI6MjA5NjQ2ODc4OH0.RYoa2eW56J-F116D-nJcMEdX0WwgJQu5hH9ELJ-hqJs"
@@ -18,7 +18,6 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 ROW_ID = "havence_project_state" 
 API_URL = f"{SUPABASE_URL}/rest/v1/total_progress_data"
 
-# Standart HTTP Başlıkları
 headers = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -42,26 +41,20 @@ def load_data_from_supabase():
 def save_data_to_supabase(data):
     try:
         payload = {"id": ROW_ID, "val": data}
-        
-        # 1. Yöntem: POST ile Upsert denemesi (Çakışma çözümlü)
         upsert_headers = headers.copy()
         upsert_headers["Prefer"] = "return=representation,resolution=merge-duplicates"
-        
         response = requests.post(API_URL, headers=upsert_headers, json=payload, timeout=10)
         
-        # Eğer 409 Conflict veya başka bir hata kodu dönerse, 2. Yöntem (PUT ile doğrudan üzerine yazma) devreye girer
         if response.status_code not in [200, 201]:
             put_url = f"{API_URL}?id=eq.{ROW_ID}"
             put_headers = headers.copy()
             put_headers["Prefer"] = "return=representation"
             response_put = requests.put(put_url, headers=put_headers, json=payload, timeout=10)
-            
             if response_put.status_code not in [200, 201, 204]:
                 st.error(f"⚠️ Bulut kaydı başarısız oldu (Durum Kodu: {response_put.status_code})")
     except Exception as e:
         st.error(f"Veri kaydedilirken hata oluştu (API): {e}")
 
-# İlk açılışta verileri çek
 if "saved_state" not in st.session_state:
     st.session_state.saved_state = load_data_from_supabase()
 
@@ -85,7 +78,18 @@ def handle_checkbox_change(cb_key, save_key, date_key):
             update_state_val(date_key, "")
 
 # ==========================================
-# 3. RAPOR ÇIKTI ŞABLONU (HTML / PDF)
+# 3. RENKLENDİRME STİL MOTORU (100% OLANLAR YEŞİL)
+# ==========================================
+def highlight_completed(row):
+    # Eğer progress kolonu 100 ise satırı yeşil yap
+    if 'Tamamlanma Oranı' in row and row['Tamamlanma Oranı'] == '% 100':
+        return ['background-color: #d4edda; color: #155724; font-weight: bold;'] * len(row)
+    elif 'İlerleme Oranı' in row and row['İlerleme Oranı'] == '% 100':
+         return ['background-color: #d4edda; color: #155724; font-weight: bold;'] * len(row)
+    return [''] * len(row)
+
+# ==========================================
+# 4. RAPOR ÇIKTI ŞABLONU
 # ==========================================
 def make_report_wrapper(title, content_html):
     today_str = date.today().strftime('%d.%m.%Y')
@@ -106,6 +110,7 @@ def make_report_wrapper(title, content_html):
             th, td {{ border: 1px solid #dddddd; padding: 12px; font-size: 14px; text-align: left; }}
             th {{ background-color: #f5f5f5; font-weight: bold; color: #111; }}
             tr:nth-child(even) {{ background-color: #fafafa; }}
+            .completed-row {{ background-color: #d4edda !important; color: #155724 !important; font-weight: bold; }}
             .total {{ font-weight: bold; background-color: #e8f5e9 !important; }}
             @media print {{ .no-print {{ display: none !important; }} body {{ margin: 10px; }} }}
         </style>
@@ -124,7 +129,7 @@ def make_report_wrapper(title, content_html):
     """
 
 # ==========================================
-# 4. YAN MENÜ & BİRİM FİYATLAR
+# 5. YAN MENÜ & BİRİM FİYATLAR
 # ==========================================
 st.sidebar.image("https://img.icons8.com/clouds/100/000000/building.png", width=80)
 st.sidebar.title("Havence Yönetim")
@@ -172,7 +177,7 @@ exterior_weights_insulated = {"ext_siva": 0.30, "ext_mant": 0.40, "ext_ast": 0.1
 exterior_weights_no_insulation = {"ext_siva": 0.45, "ext_ast": 0.15, "ext_boy": 0.40}
 
 # ==========================================
-# 5. PROJE YAPISI VE METRAJLARI
+# 6. PROJE YAPISI VE METRAJLARI
 # ==========================================
 project_structure = {
     "Kat -1 (Bodrum Katı)": {
@@ -234,7 +239,7 @@ project_structure = {
 }
 
 # ==========================================
-# 6. HESAPLAMA MOTORU VE ANALİZ MATRİSİ
+# 7. HESAPLAMA MOTORU
 # ==========================================
 flat_sections = []
 total_project_area = 0
@@ -308,6 +313,10 @@ for floor_name, sections in project_structure.items():
             sec_progress = 1.0 if is_checked else 0.0
             phases.append(("toi_ksiva", "Kara Sıva Uygulaması", is_checked))
 
+        # Floating point toleransı
+        if sec_progress > 0.98:
+            sec_progress = 1.0
+
         completed_area = area * sec_progress
         total_project_area += area
         total_completed_equivalent_area += completed_area
@@ -328,7 +337,7 @@ for floor_name, sections in project_structure.items():
 overall_progress_pct = (total_completed_equivalent_area / total_project_area) if total_project_area > 0 else 0
 
 # ==========================================
-# 7. SAYFA MODÜL YÖNLENDİRMELERİ
+# 8. SAYFA MODÜL YÖNLENDİRMELERİ
 # ==========================================
 
 # --- MODÜL 1: PROJE GENEL DURUMU ---
@@ -389,10 +398,23 @@ if app_page == "🏁 Proje Durumu & İş Programı":
 elif app_page == "💰 İşveren Hakediş Raporu":
     st.header("💰 İşveren Dönemsel Hakediş Alacak Raporu")
     
-    col_rep1, col_rep2 = st.columns([2, 1])
-    with col_rep1:
-        st.metric("İşverenden Alınacak Toplam Hakediş Tutarı", f"₺ {total_billing_owner:,.2f}")
+    # İşveren Finansal Kasa Giriş Kartları
+    owner_received = st.number_input("💵 İşverenden Alınan Toplam Ödeme (Aldığı Ödeme):", value=get_state_val("fin_owner_received", 0.0), step=5000.0)
+    update_state_val("fin_owner_received", owner_received)
     
+    owner_rest = total_billing_owner - owner_received
+    
+    col_rep1, col_rep2, col_rep3 = st.columns(3)
+    with col_rep1:
+        st.metric("Hak Edilen Toplam Tutar", f"₺ {total_billing_owner:,.2f}")
+    with col_rep2:
+        st.metric("İşverenin Ödediği Miktar", f"₺ {owner_received:,.2f}")
+    with col_rep3:
+        if owner_rest >= 0:
+            st.metric("İşverenden Kalan Alacak", f"₺ {owner_rest:,.2f}", delta="- Alınacak", delta_color="inverse")
+        else:
+            st.metric("İşverenden Fazla Alınan (Avans)", f"₺ {abs(owner_rest):,.2f}", delta="+ Avans", delta_color="normal")
+            
     report_list = []
     type_map = {
         "interior": "İç Mekan İmalatları", "exterior_front": "Ön Cephe (Yalıtımlı)", 
@@ -403,28 +425,33 @@ elif app_page == "💰 İşveren Hakediş Raporu":
     html_rows = ""
     for item in flat_sections:
         sec_bill = item["comp_area"] * item["pm_price"]
-        
         last_date = "İşlem Yok"
         for phase_code, _, _ in item["phases"]:
             d = get_state_val(f"date_{phase_code}_{item['global_idx']}", "")
             if d: last_date = d
 
         category_name = type_map.get(item["type"], "Dış Cephe")
+        prog_pct_int = int(item["progress"] * 100)
         
         report_list.append({
-            "Kat / Yapı Bölgesi": item["floor"], "Bölüm / Mahal": item["section"], "İmalat Kategorisi": category_name,
-            "Toplam Metraj": f"{item['area']:.2f} m²", "Tamamlanma Oranı": f"% {item['progress']*100:.0f}",
-            "Sözleşme Birim Fiyatı": f"₺ {item['pm_price']:.2f}", "Hakediş Tutarı": f"₺ {sec_bill:,.2f}",
+            "Kat / Yapı Bölgesi": item["floor"], 
+            "Bölüm / Mahal": item["section"], 
+            "İmalat Kategorisi": category_name,
+            "Toplam Metraj": f"{item['area']:.2f} m²", 
+            "Tamamlanma Oranı": f"% {prog_pct_int}",
+            "Sözleşme Birim Fiyatı": f"₺ {item['pm_price']:.2f}", 
+            "Hakediş Tutarı": f"₺ {sec_bill:,.2f}",
             "Son Onay Tarihi": last_date
         })
         
+        row_class = ' class="completed-row"' if prog_pct_int == 100 else ''
         html_rows += f"""
-        <tr>
+        <tr{row_class}>
             <td>{item['floor']}</td>
             <td>{item['section']}</td>
             <td>{category_name}</td>
             <td>{item['area']:.2f} m²</td>
-            <td>% {item['progress']*100:.0f}</td>
+            <td>% {prog_pct_int}</td>
             <td>₺ {item['pm_price']:.2f}</td>
             <td>₺ {sec_bill:,.2f}</td>
             <td>{last_date}</td>
@@ -448,32 +475,57 @@ elif app_page == "💰 İşveren Hakediş Raporu":
         <tbody>
             {html_rows}
             <tr class="total">
-                <td colspan="6" style="text-align: right;">TOPLAM ALACAK HAKEDİŞ:</td>
+                <td colspan="6" style="text-align: right;">TOPLAM HAK EDİLEN ALACAK:</td>
                 <td colspan="2">₺ {total_billing_owner:,.2f}</td>
+            </tr>
+            <tr class="total" style="background-color: #fff3cd !important;">
+                <td colspan="6" style="text-align: right;">İŞVERENDEN ALINAN TOPLAM ÖDEME:</td>
+                <td colspan="2">₺ {owner_received:,.2f}</td>
+            </tr>
+            <tr class="total" style="background-color: #f8d7da !important;">
+                <td colspan="6" style="text-align: right;">KALAN BAKİYE DURUMU:</td>
+                <td colspan="2">₺ {owner_rest:,.2f}</td>
             </tr>
         </tbody>
     </table>
     """
     
     final_report_code = make_report_wrapper("Havence - Resmi İşveren Hakediş Raporu", full_html_report)
-    with col_rep2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.download_button(
-            label="📄 Raporu PDF / HTML Olarak İndir",
-            data=final_report_code,
-            file_name=f"Havence_Isveren_Hakedis_{date.today().strftime('%d_%m_%Y')}.html",
-            mime="text/html",
-            use_container_width=True
-        )
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.download_button(
+        label="📄 Raporu PDF / HTML Olarak İndir",
+        data=final_report_code,
+        file_name=f"Havence_Isveren_Hakedis_{date.today().strftime('%d_%m_%Y')}.html",
+        mime="text/html"
+    )
         
     st.markdown("---")
-    st.dataframe(pd.DataFrame(report_list), use_container_width=True)
+    # Yeşillendirilmiş Pandas Tablosu Ekranı
+    df_styled = pd.DataFrame(report_list)
+    st.dataframe(df_styled.style.apply(highlight_completed, axis=1), use_container_width=True)
 
 # --- MODÜL 3: SADECE USTA HAK EDİŞLERİ ---
 elif app_page == "👷 Usta Hak Edişleri":
     st.header("👷 Sub-Contractor Labor Hak Ediş Tracking")
     
-    st.metric("Ustalara Ödenecek Toplam Tutar (Maliyet Oranı)", f"₺ {total_labor_cost:,.2f}")
+    # Usta Finansal Ödemeler Giriş Kartları
+    labor_paid = st.number_input("💵 Ustalara Yapılan Toplam Ödeme (Ödenen Tutar):", value=get_state_val("fin_labor_paid", 0.0), step=5000.0)
+    update_state_val("fin_labor_paid", labor_paid)
+    
+    labor_rest = total_labor_cost - labor_paid
+    
+    col_l1, col_l2, col_l3 = st.columns(3)
+    with col_l1:
+        st.metric("Ustalara Hak Edilen Toplam Maliyet", f"₺ {total_labor_cost:,.2f}")
+    with col_l2:
+        st.metric("Ustalara Ödenen Toplam Miktar", f"₺ {labor_paid:,.2f}")
+    with col_l3:
+        if labor_rest >= 0:
+            st.metric("Ustalara Kalan Borcumuz", f"₺ {labor_rest:,.2f}", delta="- Kalan Borç", delta_color="error")
+        else:
+            st.metric("Ustalara Fazla Ödenen (Avans)", f"₺ {abs(labor_rest):,.2f}", delta="+ Fazla Ödenen", delta_color="normal")
+            
     st.markdown("---")
     st.subheader("📋 Bölüm Bazlı Usta Hak Edişleri ve İş Bitim Kayıtları")
     
@@ -486,6 +538,7 @@ elif app_page == "👷 Usta Hak Edişleri":
     
     for item in flat_sections:
         sec_cost = item["comp_area"] * item["tech_price"]
+        prog_pct_int = int(item["progress"] * 100)
         
         done_dates = []
         for phase_code, phase_name, checked in item["phases"]:
@@ -498,13 +551,15 @@ elif app_page == "👷 Usta Hak Edişleri":
             "Konum / Kat": item["floor"],
             "Bölüm / Mahal": item["section"],
             "İş Sınıfı / Kategori": type_map.get(item["type"], "Dış Cephe"),
+            "İlerleme Oranı": f"% {prog_pct_int}",
             "Eşdeğer Biten Alan": f"{item['comp_area']:.2f} m²",
             "Usta Birim Maliyeti": f"₺ {item['tech_price']:.2f}",
             "Usta Alacağı Tutar": f"₺ {sec_cost:,.2f}",
             "Onay Tarihleri": dates_str
         })
         
-    st.dataframe(pd.DataFrame(labor_report), use_container_width=True)
+    df_labor_styled = pd.DataFrame(labor_report)
+    st.dataframe(df_labor_styled.style.apply(highlight_completed, axis=1), use_container_width=True)
 
 # --- MODÜL 4: SADECE HAVENCE KARLILIK ANALİZİ ---
 elif app_page == "📊 Havence Kârlılık Analizi":
@@ -534,18 +589,21 @@ elif app_page == "📊 Havence Kârlılık Analizi":
         sec_cost = item["comp_area"] * item["tech_price"]
         sec_bill = item["comp_area"] * item["pm_price"]
         sec_profit = sec_bill - sec_cost
+        prog_pct_int = int(item["progress"] * 100)
         
         profit_report.append({
             "Konum / Kat": item["floor"],
             "Bölüm / Mahal": item["section"],
             "Kategori": type_map.get(item["type"], "Dış Cephe"),
+            "Tamamlanma Oranı": f"% {prog_pct_int}",
             "Eşdeğer Biten Alan": f"{item['comp_area']:.2f} m²",
             "İşveren Satış Tutarı": f"₺ {sec_bill:,.2f}",
             "Usta Maliyet Tutarı": f"₺ {sec_cost:,.2f}",
             "Havence Net Kâr": f"₺ {sec_profit:,.2f}"
         })
         
-    st.dataframe(pd.DataFrame(profit_report), use_container_width=True)
+    df_profit_styled = pd.DataFrame(profit_report)
+    st.dataframe(df_profit_styled.style.apply(highlight_completed, axis=1), use_container_width=True)
 
 # --- MODÜL 5: İÇ MEKAN İŞLERİ ---
 elif app_page == "🏠 İç Mekan İşleri (Alçı & Boya)":
@@ -639,7 +697,7 @@ elif app_page == "💧 Tuvalet & Islak Hacim (Kara Sıva)":
 
 # --- MODÜL 8: ZAMAN AKIŞ KAYITLARI ---
 elif app_page == "⏱️ Şantiye Günlüğü & Zaman Çizelgesi":
-    st.header("⏱️ Şantiyede Tamamlanan İşlerin Geçmiş Zaman Kronolojisi")
+    st.header("⏱️ Şantiyede Tamamlanan İşlerin Geçmiş Zaman Kronлоговisi")
     
     timeline_events = []
     for item in flat_sections:
