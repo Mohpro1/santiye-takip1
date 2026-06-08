@@ -50,8 +50,6 @@ def save_data_to_supabase(data):
             put_headers = headers.copy()
             put_headers["Prefer"] = "return=representation"
             response_put = requests.put(put_url, headers=put_headers, json=payload, timeout=10)
-            if response_put.status_code not in [200, 201, 204]:
-                st.error(f"⚠️ Bulut kaydı başarısız oldu (Durum Kodu: {response_put.status_code})")
     except Exception as e:
         st.error(f"Veri kaydedilirken hata oluştu (API): {e}")
 
@@ -81,7 +79,6 @@ def handle_checkbox_change(cb_key, save_key, date_key):
 # 3. RENKLENDİRME STİL MOTORU (100% OLANLAR YEŞİL)
 # ==========================================
 def highlight_completed(row):
-    # Eğer progress kolonu 100 ise satırı yeşil yap
     if 'Tamamlanma Oranı' in row and row['Tamamlanma Oranı'] == '% 100':
         return ['background-color: #d4edda; color: #155724; font-weight: bold;'] * len(row)
     elif 'İlerleme Oranı' in row and row['İlerleme Oranı'] == '% 100':
@@ -313,7 +310,6 @@ for floor_name, sections in project_structure.items():
             sec_progress = 1.0 if is_checked else 0.0
             phases.append(("toi_ksiva", "Kara Sıva Uygulaması", is_checked))
 
-        # Floating point toleransı
         if sec_progress > 0.98:
             sec_progress = 1.0
 
@@ -394,24 +390,53 @@ if app_page == "🏁 Proje Durumu & İş Programı":
     else:
         c_m3.error("🔴 Zaman Planının Gerisinde")
 
-# --- MODÜL 2: İŞVEREN HAKEDİŞ RAPORU ---
+# --- MODÜL 2: İŞVEREN HAKEDİŞ RAPORU (DÖNEMSEL PARÇALI ÖDEMELER) ---
 elif app_page == "💰 İşveren Hakediş Raporu":
     st.header("💰 İşveren Dönemsel Hakediş Alacak Raporu")
     
-    # İşveren Finansal Kasa Giriş Kartları
-    owner_received = st.number_input("💵 İşverenden Alınan Toplam Ödeme (Aldığı Ödeme):", value=get_state_val("fin_owner_received", 0.0), step=5000.0)
-    update_state_val("fin_owner_received", owner_received)
+    # Çoklu hakediş tahsilat geçmişi (List of dicts)
+    owner_payments_history = get_state_val("owner_payments_history_list", [])
     
-    owner_rest = total_billing_owner - owner_received
+    st.subheader("📥 İşverenden Alınan Parçalı Ödeme Girişi")
+    op_col1, op_col2, op_col3 = st.columns([2, 2, 1])
+    with op_col1:
+        new_op_amount = st.number_input("Alınan Ödeme Tutarı (₺):", min_value=0.0, step=1000.0, key="new_op_amt")
+    with op_col2:
+        new_op_date = st.date_input("Ödeme Alınma Tarihi:", value=date.today(), key="new_op_dt")
+    with op_col3:
+        st.write("<br>", unsafe_allow_html=True)
+        if st.button("📥 Yeni Ödeme Ekle", use_container_width=True):
+            if new_op_amount > 0:
+                owner_payments_history.append({
+                    "Tarih": new_op_date.strftime("%d.%m.%Y"),
+                    "Miktar": new_op_amount
+                })
+                update_state_val("owner_payments_history_list", owner_payments_history)
+                st.rerun()
+
+    # Toplam Alınan Ödemeyi Hesaplama
+    total_owner_received = sum([p["Miktar"] for p in owner_payments_history])
+    owner_rest = total_billing_owner - total_owner_received
+    
+    # Ödeme Geçmişi Tablosu Gösterimi
+    if owner_payments_history:
+        with st.expander("🔍 İşveren Alınan Ödemeler Detay Listesi", expanded=False):
+            df_op_hist = pd.DataFrame(owner_payments_history)
+            st.dataframe(df_op_hist, use_container_width=True)
+            if st.button("🗑️ Tüm Ödeme Geçmişini Temizle", key="clear_op_hist"):
+                update_state_val("owner_payments_history_list", [])
+                st.rerun()
+                
+    st.markdown("---")
     
     col_rep1, col_rep2, col_rep3 = st.columns(3)
     with col_rep1:
         st.metric("Hak Edilen Toplam Tutar", f"₺ {total_billing_owner:,.2f}")
     with col_rep2:
-        st.metric("İşverenin Ödediği Miktar", f"₺ {owner_received:,.2f}")
+        st.metric("İşverenin Ödediği Toplam", f"₺ {total_owner_received:,.2f}")
     with col_rep3:
         if owner_rest >= 0:
-            st.metric("İşverenden Kalan Alacak", f"₺ {owner_rest:,.2f}", delta="- Alınacak", delta_color="inverse")
+            st.metric("İşverenden Kalan Alacak", f"₺ {owner_rest:,.2f}", delta="- Kalan Alacak", delta_color="inverse")
         else:
             st.metric("İşverenden Fazla Alınan (Avans)", f"₺ {abs(owner_rest):,.2f}", delta="+ Avans", delta_color="normal")
             
@@ -480,7 +505,7 @@ elif app_page == "💰 İşveren Hakediş Raporu":
             </tr>
             <tr class="total" style="background-color: #fff3cd !important;">
                 <td colspan="6" style="text-align: right;">İŞVERENDEN ALINAN TOPLAM ÖDEME:</td>
-                <td colspan="2">₺ {owner_received:,.2f}</td>
+                <td colspan="2">₺ {total_owner_received:,.2f}</td>
             </tr>
             <tr class="total" style="background-color: #f8d7da !important;">
                 <td colspan="6" style="text-align: right;">KALAN BAKİYE DURUMU:</td>
@@ -501,28 +526,55 @@ elif app_page == "💰 İşveren Hakediş Raporu":
     )
         
     st.markdown("---")
-    # Yeşillendirilmiş Pandas Tablosu Ekranı
     df_styled = pd.DataFrame(report_list)
     st.dataframe(df_styled.style.apply(highlight_completed, axis=1), use_container_width=True)
 
-# --- MODÜL 3: SADECE USTA HAK EDİŞLERİ ---
+# --- MODÜL 3: USTA HAK EDİŞLERİ (PARÇALI ÖDEMELER & HAKEDİŞ GEÇMİŞİ) ---
 elif app_page == "👷 Usta Hak Edişleri":
     st.header("👷 Sub-Contractor Labor Hak Ediş Tracking")
     
-    # Usta Finansal Ödemeler Giriş Kartları
-    labor_paid = st.number_input("💵 Ustalara Yapılan Toplam Ödeme (Ödenen Tutar):", value=get_state_val("fin_labor_paid", 0.0), step=5000.0)
-    update_state_val("fin_labor_paid", labor_paid)
+    # Çoklu Usta Ödeme Geçmişi listesi
+    labor_payments_history = get_state_val("labor_payments_history_list", [])
     
-    labor_rest = total_labor_cost - labor_paid
+    st.subheader("📤 Ustalara Yapılan Parçalı Ödeme Girişi")
+    lp_col1, lp_col2, lp_col3 = st.columns([2, 2, 1])
+    with lp_col1:
+        new_lp_amount = st.number_input("Ustalara Ödenen Tutar (₺):", min_value=0.0, step=1000.0, key="new_lp_amt")
+    with lp_col2:
+        new_lp_date = st.date_input("Ödeme Yapılma Tarihi:", value=date.today(), key="new_lp_dt")
+    with lp_col3:
+        st.write("<br>", unsafe_allow_html=True)
+        if st.button("📤 Ödeme Kaydet", use_container_width=True):
+            if new_lp_amount > 0:
+                labor_payments_history.append({
+                    "Tarih": new_lp_date.strftime("%d.%m.%Y"),
+                    "Miktar": new_lp_amount
+                })
+                update_state_val("labor_payments_history_list", labor_payments_history)
+                st.rerun()
+
+    # Toplam Ödenen Usta Ücreti Hesaplama
+    total_labor_paid = sum([p["Miktar"] for p in labor_payments_history])
+    labor_rest = total_labor_cost - total_labor_paid
     
+    # Usta Ödeme Geçmişi Listesi Gösterimi
+    if labor_payments_history:
+        with st.expander("🔍 Ustalara Yapılan Ödemeler Geçmiş Listesi", expanded=False):
+            df_lp_hist = pd.DataFrame(labor_payments_history)
+            st.dataframe(df_lp_hist, use_container_width=True)
+            if st.button("🗑️ Tüm Usta Ödeme Geçmişini Temizle", key="clear_lp_hist"):
+                update_state_val("labor_payments_history_list", [])
+                st.rerun()
+
+    st.markdown("---")
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l1:
         st.metric("Ustalara Hak Edilen Toplam Maliyet", f"₺ {total_labor_cost:,.2f}")
     with col_l2:
-        st.metric("Ustalara Ödenen Toplam Miktar", f"₺ {labor_paid:,.2f}")
+        st.metric("Ustalara Ödenen Toplam Miktar", f"₺ {total_labor_paid:,.2f}")
     with col_l3:
         if labor_rest >= 0:
-            st.metric("Ustalara Kalan Borcumuz", f"₺ {labor_rest:,.2f}", delta="- Kalan Borç", delta_color="error")
+            st.metric("Ustalara Kalan Borcumuz", f"₺ {labor_rest:,.2f}", delta="- Kalan Borç", delta_color="inverse")
         else:
             st.metric("Ustalara Fazla Ödenen (Avans)", f"₺ {abs(labor_rest):,.2f}", delta="+ Fazla Ödenen", delta_color="normal")
             
@@ -550,7 +602,7 @@ elif app_page == "👷 Usta Hak Edişleri":
         labor_report.append({
             "Konum / Kat": item["floor"],
             "Bölüm / Mahal": item["section"],
-            "İş Sınıfı / Kategori": type_map.get(item["type"], "Dış Cephe"),
+            "İş Sınıف / Kategori": type_map.get(item["type"], "Dış Cephe"),
             "İlerleme Oranı": f"% {prog_pct_int}",
             "Eşdeğer Biten Alan": f"{item['comp_area']:.2f} m²",
             "Usta Birim Maliyeti": f"₺ {item['tech_price']:.2f}",
@@ -561,7 +613,7 @@ elif app_page == "👷 Usta Hak Edişleri":
     df_labor_styled = pd.DataFrame(labor_report)
     st.dataframe(df_labor_styled.style.apply(highlight_completed, axis=1), use_container_width=True)
 
-# --- MODÜL 4: SADECE HAVENCE KARLILIK ANALİZİ ---
+# --- MODÜL 4: HAVENCE KARLILIK ANALİZİ ---
 elif app_page == "📊 Havence Kârlılık Analizi":
     st.header("📊 Havence Şantiye Finansal Kârlılık Analiz Paneli")
     
@@ -697,7 +749,7 @@ elif app_page == "💧 Tuvalet & Islak Hacim (Kara Sıva)":
 
 # --- MODÜL 8: ZAMAN AKIŞ KAYITLARI ---
 elif app_page == "⏱️ Şantiye Günlüğü & Zaman Çizelgesi":
-    st.header("⏱️ Şantiyede Tamamlanan İşlerin Geçmiş Zaman Kronлоговisi")
+    st.header("⏱️ Şantiyede Tamamlanan İşlerin Geçmiş Zaman Kronolojisi")
     
     timeline_events = []
     for item in flat_sections:
