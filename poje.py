@@ -10,7 +10,7 @@ import json
 st.set_page_config(page_title="Havence - Şantiye & Kârlılık Takip Sistemi", layout="wide", page_icon="🏗️")
 
 # ==========================================
-# 2. SUPABASE REST API BAĞLANTI AYARLARI (GÜVENLİ VE KESİN ÇÖZÜM)
+# 2. SUPABASE REST API BAĞLANTI AYARLARI (409 HATASI ÇÖZÜLDÜ)
 # ==========================================
 SUPABASE_URL = "https://lhndsijncxofuvhwkarc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxobmRzaWpuY3hvZnV2aHdrYXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4OTI3ODgsImV4cCI6MjA5NjQ2ODc4OH0.RYoa2eW56J-F116D-nJcMEdX0WwgJQu5hH9ELJ-hqJs"
@@ -18,19 +18,19 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 ROW_ID = "havence_project_state" 
 API_URL = f"{SUPABASE_URL}/rest/v1/total_progress_data"
 
-# HTTP Başlıkları (Headers)
+# Standart HTTP Başlıkları
 headers = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json",
-    "Prefer": "return=representation"
+    "Content-Type": "application/json"
 }
 
 def load_data_from_supabase():
     try:
-        # Doğrudan HTTP GET İsteği
         url = f"{API_URL}?id=eq.{ROW_ID}"
-        response = requests.get(url, headers=headers, timeout=10)
+        get_headers = headers.copy()
+        get_headers["Prefer"] = "return=representation"
+        response = requests.get(url, headers=get_headers, timeout=10)
         if response.status_code == 200:
             res_json = response.json()
             if res_json and len(res_json) > 0:
@@ -41,14 +41,23 @@ def load_data_from_supabase():
 
 def save_data_to_supabase(data):
     try:
-        # Doğrudan HTTP POST (Upsert) İsteği
         payload = {"id": ROW_ID, "val": data}
+        
+        # 1. Yöntem: POST ile Upsert denemesi (Çakışma çözümlü)
         upsert_headers = headers.copy()
-        upsert_headers["Prefer"] = "resolution=merge" # Supabase için UPSERT (Varsa güncelle yoksa ekle)
+        upsert_headers["Prefer"] = "return=representation,resolution=merge-duplicates"
         
         response = requests.post(API_URL, headers=upsert_headers, json=payload, timeout=10)
+        
+        # Eğer 409 Conflict veya başka bir hata kodu dönerse, 2. Yöntem (PUT ile doğrudan üzerine yazma) devreye girer
         if response.status_code not in [200, 201]:
-            st.error(f"⚠️ Bulut kaydı başarısız oldu (Durum Kodu: {response.status_code})")
+            put_url = f"{API_URL}?id=eq.{ROW_ID}"
+            put_headers = headers.copy()
+            put_headers["Prefer"] = "return=representation"
+            response_put = requests.put(put_url, headers=put_headers, json=payload, timeout=10)
+            
+            if response_put.status_code not in [200, 201, 204]:
+                st.error(f"⚠️ Bulut kaydı başarısız oldu (Durum Kodu: {response_put.status_code})")
     except Exception as e:
         st.error(f"Veri kaydedilirken hata oluştu (API): {e}")
 
