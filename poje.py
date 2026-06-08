@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date
-from supabase import create_client, Client
+import requests
+import json
 
 # ==========================================
 # 1. SAYFA AYARLARI
@@ -9,46 +10,47 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Havence - Şantiye & Kârlılık Takip Sistemi", layout="wide", page_icon="🏗️")
 
 # ==========================================
-# 2. SUPABASE BAĞLANTI AYARLARI (PROXY HATASI DÜZELTİLDİ)
+# 2. SUPABASE REST API BAĞLANTI AYARLARI (GÜVENLİ VE KESİN ÇÖZÜM)
 # ==========================================
 SUPABASE_URL = "https://lhndsijncxofuvhwkarc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxobmRzaWpuY3hvZnV2aHdrYXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4OTI3ODgsImV4cCI6MjA5NjQ2ODc4OH0.RYoa2eW56J-F116D-nJcMEdX0WwgJQu5hH9ELJ-hqJs"
 
-supabase = None
-
-# Proxy hatasını bypass eden güvenli bağlantı mimarisi
-try:
-    from supabase.client import ClientOptions
-    options = ClientOptions(postgrest_client_timeout=15, storage_client_timeout=15)
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY, options=options)
-except Exception as e:
-    try:
-        # Alternatif doğrudan istemci yükleme yöntemi
-        supabase = Client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e2:
-        supabase = None
-
 ROW_ID = "havence_project_state" 
+API_URL = f"{SUPABASE_URL}/rest/v1/total_progress_data"
+
+# HTTP Başlıkları (Headers)
+headers = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=representation"
+}
 
 def load_data_from_supabase():
-    if supabase is None:
-        return {}
     try:
-        response = supabase.table("total_progress_data").select("val").eq("id", ROW_ID).execute()
-        if response.data and len(response.data) > 0:
-            return response.data[0]["val"]
+        # Doğrudan HTTP GET İsteği
+        url = f"{API_URL}?id=eq.{ROW_ID}"
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            res_json = response.json()
+            if res_json and len(res_json) > 0:
+                return res_json[0].get("val", {})
     except Exception as e:
         st.sidebar.warning(f"🔄 Veritabanı senkronizasyon kontrolü: {e}")
     return {}
 
 def save_data_to_supabase(data):
-    if supabase is None:
-        st.error("⚠️ Veritabanı bağlantısı kurulamadığı için değişiklikler kaydedilemedi!")
-        return
     try:
-        supabase.table("total_progress_data").upsert({"id": ROW_ID, "val": data}).execute()
+        # Doğrudan HTTP POST (Upsert) İsteği
+        payload = {"id": ROW_ID, "val": data}
+        upsert_headers = headers.copy()
+        upsert_headers["Prefer"] = "resolution=merge" # Supabase için UPSERT (Varsa güncelle yoksa ekle)
+        
+        response = requests.post(API_URL, headers=upsert_headers, json=payload, timeout=10)
+        if response.status_code not in [200, 201]:
+            st.error(f"⚠️ Bulut kaydı başarısız oldu (Durum Kodu: {response.status_code})")
     except Exception as e:
-        st.error(f"Veri kaydedilirken hata oluştu (Supabase): {e}")
+        st.error(f"Veri kaydedilirken hata oluştu (API): {e}")
 
 # İlk açılışta verileri çek
 if "saved_state" not in st.session_state:
@@ -495,7 +497,7 @@ elif app_page == "👷 Usta Hak Edişleri":
         
     st.dataframe(pd.DataFrame(labor_report), use_container_width=True)
 
-# --- MODÜL 4: SADECE HAVENCE KARLILIK ANALİZİ (AYRI SAYFA) ---
+# --- MODÜL 4: SADECE HAVENCE KARLILIK ANALİZİ ---
 elif app_page == "📊 Havence Kârlılık Analizi":
     st.header("📊 Havence Şantiye Finansal Kârlılık Analiz Paneli")
     
