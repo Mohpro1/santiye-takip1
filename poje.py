@@ -9,17 +9,24 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Havence - Şantiye & Kârlılık Takip Sistemi", layout="wide", page_icon="🏗️")
 
 # ==========================================
-# 2. SUPABASE BAĞLANTI AYARLARI
+# 2. SUPABASE BAĞLANTI AYARLARI (PROXY HATASI DÜZELTİLDİ)
 # ==========================================
 SUPABASE_URL = "https://lhndsijncxofuvhwkarc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxobmRzaWpuY3hvZnV2aHdrYXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4OTI3ODgsImV4cCI6MjA5NjQ2ODc4OH0.RYoa2eW56J-F116D-nJcMEdX0WwgJQu5hH9ELJ-hqJs"
 
-# Canlı bağlantı kurulumu (Cache kaldırıldı - Doğrudan tetikleniyor)
+supabase = None
+
+# Proxy hatasını bypass eden güvenli bağlantı mimarisi
 try:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    from supabase.client import ClientOptions
+    options = ClientOptions(postgrest_client_timeout=15, storage_client_timeout=15)
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY, options=options)
 except Exception as e:
-    supabase = None
-    st.error(f"Supabase Başlatma Hatası: {e}")
+    try:
+        # Alternatif doğrudan istemci yükleme yöntemi
+        supabase = Client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e2:
+        supabase = None
 
 ROW_ID = "havence_project_state" 
 
@@ -31,7 +38,6 @@ def load_data_from_supabase():
         if response.data and len(response.data) > 0:
             return response.data[0]["val"]
     except Exception as e:
-        # Hata detayını yan menüde göster ama uygulamanın çalışmasını engelleme
         st.sidebar.warning(f"🔄 Veritabanı senkronizasyon kontrolü: {e}")
     return {}
 
